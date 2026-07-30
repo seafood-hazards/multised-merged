@@ -20,9 +20,9 @@ The aquaculture sites themselves are on the [Aquaculture Map](./aquaculture-map.
 //| output: false
 L = require("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js")
 
-home_lat = 58
+home_lat = 65
 home_lng = 10
-home_zoom = 4
+home_zoom = 3
 
 views = [
   { label: "Distance to coast",       column: "dist_to_coast",       unit: "km" },

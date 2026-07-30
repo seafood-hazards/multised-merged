@@ -19,9 +19,9 @@ sediment fraction. Bulk and sieved are kept apart: pick the fraction in the side
 //| output: false
 L = require("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js")
 
-home_lat = 58
+home_lat = 65
 home_lng = 10
-home_zoom = 4
+home_zoom = 3
 
 elements = [
   { label: "Cobalt (Co)",             value: "CO" },
@@ -52,7 +52,7 @@ mutable clicked_point = null
 //| panel: sidebar
 
 viewof selected_element = Inputs.select(elements, {
-  label: "Element:", format: d => d.label, value: elements[6]
+  label: "Element:", format: d => d.label, value: elements[0]
 })
 
 viewof selected_fraction = Inputs.select(fractions, {
