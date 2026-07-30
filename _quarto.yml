@@ -22,14 +22,14 @@ website:
             href: db-schema-merged.qmd
           - text: "DB Schema (Aquaculture)"
             href: db-schema-aquaculture.qmd
-      - text: "Data View"
+      - text: "Explore"
         menu:
-          - text: "Data Viewer (Merged)"
-            href: data-viewer-merged.qmd
-          - text: "Data Viewer (Aquaculture)"
-            href: data-viewer-aquaculture.qmd
-          - text: "Sediment Map"
-            href: sediment-map.qmd
+          - text: "Merged Tables"
+            href: merged-tables.qmd
+          - text: "Aquaculture Tables"
+            href: aquaculture-tables.qmd
+          - text: "Element Map"
+            href: element-map.qmd
           - text: "Location Map"
             href: location-map.qmd
           - text: "Grain Size Map"

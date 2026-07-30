@@ -1,5 +1,5 @@
 ---
-title: "Data Viewer (Merged)"
+title: "Merged Tables"
 format:
   html:
     page-layout: full

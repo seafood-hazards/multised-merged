@@ -1,5 +1,5 @@
 ---
-title: "Sediment Map"
+title: "Element Map"
 subtitle: "Trace elements, normalisers and organic carbon across the merged database"
 format:
   html:

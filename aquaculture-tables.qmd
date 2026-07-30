@@ -1,5 +1,5 @@
 ---
-title: "Data Viewer (Aquaculture)"
+title: "Aquaculture Tables"
 format:
   html:
     page-layout: full

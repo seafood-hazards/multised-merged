@@ -56,12 +56,12 @@ final merge:
 - [DB Schema (Aquaculture)](./db-schema-aquaculture.qmd): the layout of the
   aquaculture reference database.
 
-**Data View** browses the databases in the page, with no server (the SQLite files run
+**Explore** browses the databases in the page, with no server (the SQLite files run
 in the browser via WebAssembly):
 
-- [Data Viewer (Merged)](./data-viewer-merged.qmd) and
-  [Data Viewer (Aquaculture)](./data-viewer-aquaculture.qmd): paginated table browsers.
-- [Sediment Map](./sediment-map.qmd): trace elements, normalisers and organic carbon
+- [Merged Tables](./merged-tables.qmd) and
+  [Aquaculture Tables](./aquaculture-tables.qmd): paginated table browsers.
+- [Element Map](./element-map.qmd): trace elements, normalisers and organic carbon
   per site (bulk or sieved).
 - [Location Map](./location-map.qmd): site depth, distance to coast, and distance to
   aquaculture.
