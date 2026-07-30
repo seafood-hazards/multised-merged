@@ -1,0 +1,129 @@
+---
+title: "Grain Size Map"
+subtitle: "Bulk samples and sieved sites (<63 µm and <20 µm)"
+format:
+  html:
+    page-layout: full
+---
+
+```{=html}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+```
+
+Where each sediment fraction was sampled: bulk (whole sample), sieved to <63 µm, and
+sieved to <20 µm. A site can appear in more than one category. Choose a category in
+the sidebar, or show all together.
+
+{{< include _db-setup.qmd >}}
+
+```{ojs}
+//| output: false
+L = require("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js")
+
+home_lat = 58
+home_lng = 10
+home_zoom = 4
+
+CAT_COL = ({ bulk: "#4477AA", sieved63: "#EE6677", sieved20: "#CCBB44" })
+CAT_LAB = ({ bulk: "Bulk", sieved63: "Sieved <63 um", sieved20: "Sieved <20 um" })
+
+categories = [
+  { key: "all",      label: "All" },
+  { key: "bulk",     label: "Bulk" },
+  { key: "sieved63", label: "Sieved <63 um" },
+  { key: "sieved20", label: "Sieved <20 um" }
+]
+
+// one row per (site, category)
+all_data = db.query(`
+  SELECT DISTINCT si.latitude AS latitude, si.longitude AS longitude,
+    CASE WHEN m.frac_class = 'bulk'   THEN 'bulk'
+         WHEN m.sieve_um_std = 63     THEN 'sieved63'
+         WHEN m.sieve_um_std = 20     THEN 'sieved20' END AS cat
+  FROM measurement m
+    JOIN subsample sub ON sub.subsample_id = m.subsample_id
+    JOIN event e       ON e.event_id       = sub.event_id
+    JOIN site si       ON si.site_id       = e.site_id
+  WHERE (m.frac_class = 'bulk' OR m.sieve_um_std IN (63, 20))
+    AND si.latitude IS NOT NULL AND si.longitude IS NOT NULL
+`)
+```
+
+```{ojs}
+//| panel: sidebar
+viewof selected_cat = Inputs.select(categories, {
+  label: "Category:", format: d => d.label, value: categories[0]
+})
+```
+
+```{ojs}
+//| panel: fill
+
+// draw bulk first, sieved on top so the rarer sieved points stay visible
+draw_order = ["bulk", "sieved63", "sieved20"]
+map_data = (selected_cat.key === "all"
+    ? all_data
+    : all_data.filter(d => d.cat === selected_cat.key))
+  .filter(d => d.cat != null)
+  .slice()
+  .sort((a, b) => draw_order.indexOf(a.cat) - draw_order.indexOf(b.cat))
+
+shown_cats = selected_cat.key === "all" ? draw_order : [selected_cat.key]
+
+{
+  const container = html`<div class="map-container"><div id="map"></div></div>`
+  yield container
+
+  if (!container._map) {
+    const map = L.map(container.querySelector("#map"), { zoomControl: true })
+      .setView([home_lat, home_lng], home_zoom)
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors"
+    }).addTo(map)
+
+    const HomeControl = L.Control.extend({
+      options: { position: "topleft" },
+      onAdd(map) {
+        const btn = L.DomUtil.create("a", "leaflet-home-button")
+        btn.innerHTML = '<i class="fa fa-expand" aria-hidden="true"></i>'
+        btn.title = "Reset view"
+        L.DomEvent.on(btn, "click", e => {
+          L.DomEvent.stopPropagation(e); map.setView([home_lat, home_lng], home_zoom)
+        })
+        return btn
+      }
+    })
+    new HomeControl().addTo(map)
+
+    const LegendControl = L.Control.extend({
+      options: { position: "bottomright" },
+      onAdd() { const d = L.DomUtil.create("div", "legend"); d.id = "map-legend"; return d }
+    })
+    new LegendControl().addTo(map)
+
+    container._map = map
+    container._markers = L.layerGroup().addTo(map)
+  }
+
+  const { _map: map, _markers: markers } = container
+  const legendEl = map.getContainer().querySelector("#map-legend")
+  if (legendEl) {
+    legendEl.innerHTML = `<div class="legend-title">Sediment fraction</div>` +
+      shown_cats.map(c =>
+        `<div class="legend-row"><span class="legend-swatch" style="background:${CAT_COL[c]}"></span> ${CAT_LAB[c]}</div>`
+      ).join("")
+  }
+
+  markers.clearLayers()
+  for (const d of map_data) {
+    const circle = L.circleMarker([d.latitude, d.longitude], {
+      radius: 5, fillColor: CAT_COL[d.cat],
+      color: "#333", weight: 0.6, opacity: 1, fillOpacity: 0.8
+    })
+    circle.bindTooltip(CAT_LAB[d.cat], { sticky: true })
+    markers.addLayer(circle)
+  }
+}
+
+md`**${selected_cat.label}** · **${map_data.length}** site-fraction points`
+```

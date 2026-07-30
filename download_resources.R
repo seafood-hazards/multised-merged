@@ -1,0 +1,45 @@
+options(timeout = 600)
+
+# ── SQLite databases ───────────────────────────────────────────────────────
+# The merged database and the Norwegian aquaculture reference, from this repo's
+# GitHub release. Downloaded once; a local copy (e.g. symlinked from the pipeline
+# output) is reused if present.
+release <- "https://github.com/seafood-hazards/multised-merged/releases/download/v0.1.0"
+dbs <- c("multised_merged.sqlite", "aquaculture_no.sqlite")
+for (f in dbs) {
+  if (!file.exists(f)) {
+    download.file(file.path(release, f), f, mode = "wb")
+    message(f, " downloaded.")
+  } else {
+    message("Using existing ", f)
+  }
+}
+
+# ── sql.js + stratum-sqlite ────────────────────────────────────────────────
+# All four files are downloaded once and served from the site.
+# sql-wasm.js and sql-wasm.wasm are the sql.js engine that stratum-sqlite uses.
+# stratum-sqlite.umd.js and stratum-sqlite.esm.js wrap sql.js with a clean API.
+sqljs_dir <- "libs/sqljs"
+dir.create(sqljs_dir, recursive = TRUE, showWarnings = FALSE)
+
+# sql.js engine files
+sqljs_base <- "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/"
+for (f in c("sql-wasm.js", "sql-wasm.wasm")) {
+  dest <- file.path(sqljs_dir, f)
+  if (!file.exists(dest)) {
+    download.file(paste0(sqljs_base, f), dest, mode = "wb")
+    message(f, " downloaded.")
+  }
+}
+
+# stratum-sqlite libraries
+for (f in c("stratum-sqlite.umd.js", "stratum-sqlite.esm.js")) {
+  dest <- file.path(sqljs_dir, f)
+  if (!file.exists(dest)) {
+    download.file(
+      paste0("https://github.com/stratum-toolkit/stratum-sqlite/releases/latest/download/", f),
+      dest, mode = "wb"
+    )
+    message(f, " downloaded.")
+  }
+}

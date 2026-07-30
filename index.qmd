@@ -56,6 +56,18 @@ final merge:
 - [DB Schema (Aquaculture)](./db-schema-aquaculture.qmd): the layout of the
   aquaculture reference database.
 
+**Data View** browses the databases in the page, with no server (the SQLite files run
+in the browser via WebAssembly):
+
+- [Data Viewer (Merged)](./data-viewer-merged.qmd) and
+  [Data Viewer (Aquaculture)](./data-viewer-aquaculture.qmd): paginated table browsers.
+- [Sediment Map](./sediment-map.qmd): trace elements, normalisers and organic carbon
+  per site (bulk or sieved).
+- [Location Map](./location-map.qmd): depth, distance to coast and to aquaculture, and
+  the aquaculture sites themselves.
+- [Grain Size Map](./grain-size-map.qmd): bulk and sieved (<63 µm, <20 µm) sample
+  locations.
+
 ::: {.callout-note}
 How the merged database is built, step by step (union, deduplication, finalise) and
 how the aquaculture table is created are documented on the

@@ -1,5 +1,9 @@
 project:
   type: website
+  pre-render: download_resources.R
+  resources:
+    - "*.sqlite"
+    - libs/
 
 website:
   title: "multised (merged)"
@@ -18,6 +22,18 @@ website:
             href: db-schema-merged.qmd
           - text: "DB Schema (Aquaculture)"
             href: db-schema-aquaculture.qmd
+      - text: "Data View"
+        menu:
+          - text: "Data Viewer (Merged)"
+            href: data-viewer-merged.qmd
+          - text: "Data Viewer (Aquaculture)"
+            href: data-viewer-aquaculture.qmd
+          - text: "Sediment Map"
+            href: sediment-map.qmd
+          - text: "Location Map"
+            href: location-map.qmd
+          - text: "Grain Size Map"
+            href: grain-size-map.qmd
 
 format:
   html:
@@ -25,6 +41,7 @@ format:
     css: styles.css
     toc: true
     df-print: kable
+    include-in-header: header.html
 
 execute:
   echo: false

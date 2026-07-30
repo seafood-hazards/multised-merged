@@ -4,3 +4,52 @@
 table {
   font-size: 0.9rem;
 }
+
+/* ── Leaflet map pages ─────────────────────────────────────────────────── */
+.map-container { height: 560px; width: 100%; }
+#map            { height: 100%; width: 100%; border-radius: 6px; }
+
+/* Legend */
+.legend {
+  background: white;
+  padding: 8px 12px;
+  border-radius: 5px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+  line-height: 1.6;
+  font-size: 13px;
+}
+.legend-title { font-weight: bold; margin-bottom: 4px; }
+.legend-bar {
+  width: 160px; height: 12px;
+  border-radius: 2px;
+  margin: 4px 0;
+}
+.legend-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #555;
+}
+.legend-row { display: flex; align-items: center; gap: 6px; }
+.legend-swatch {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1px solid #333; display: inline-block;
+}
+
+/* Home button */
+.leaflet-home-button {
+  background: white;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  width: 34px; height: 34px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 30px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #444;
+  text-decoration: none;
+}
+.leaflet-home-button:hover { background: #f4f4f4; color: #000; }

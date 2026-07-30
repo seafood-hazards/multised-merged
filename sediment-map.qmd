@@ -1,0 +1,191 @@
+---
+title: "Sediment Map"
+subtitle: "Trace elements, normalisers and organic carbon across the merged database"
+format:
+  html:
+    page-layout: full
+---
+
+```{=html}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+```
+
+Average standardised concentration (mg/kg) per site for the selected element and
+sediment fraction. Bulk and sieved are kept apart: pick the fraction in the sidebar.
+
+{{< include _db-setup.qmd >}}
+
+```{ojs}
+//| output: false
+L = require("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js")
+
+home_lat = 58
+home_lng = 10
+home_zoom = 4
+
+elements = [
+  { label: "Cobalt (Co)",             value: "CO" },
+  { label: "Copper (Cu)",             value: "CU" },
+  { label: "Iodine (I)",              value: "I" },
+  { label: "Manganese (Mn)",          value: "MN" },
+  { label: "Molybdenum (Mo)",         value: "MO" },
+  { label: "Selenium (Se)",           value: "SE" },
+  { label: "Zinc (Zn)",               value: "ZN" },
+  { label: "Aluminium (Al)",          value: "AL" },
+  { label: "Iron (Fe)",               value: "FE" },
+  { label: "Organic carbon (CORG)",   value: "CORG" },
+  { label: "Organic carbon <63 (TOC63)", value: "TOC63" }
+]
+
+fractions = [
+  { label: "Bulk",   value: "bulk" },
+  { label: "Sieved", value: "sieved" }
+]
+```
+
+```{ojs}
+//| output: false
+mutable clicked_point = null
+```
+
+```{ojs}
+//| panel: sidebar
+
+viewof selected_element = Inputs.select(elements, {
+  label: "Element:", format: d => d.label, value: elements[6]
+})
+
+viewof selected_fraction = Inputs.select(fractions, {
+  label: "Fraction:", format: d => d.label, value: fractions[0]
+})
+```
+
+```{ojs}
+//| panel: fill
+
+map_data = db.query(`
+  SELECT si.latitude  AS latitude,
+         si.longitude AS longitude,
+         AVG(m.value_std) AS avg_value
+  FROM measurement m
+    JOIN subsample sub ON sub.subsample_id = m.subsample_id
+    JOIN event e       ON e.event_id       = sub.event_id
+    JOIN site si       ON si.site_id       = e.site_id
+  WHERE m.symbol = '${selected_element.value}'
+    AND m.frac_class = '${selected_fraction.value}'
+    AND si.latitude IS NOT NULL AND si.longitude IS NOT NULL
+  GROUP BY si.latitude, si.longitude
+`)
+
+value_extent = d3.extent(map_data, d => d.avg_value)
+value_min = value_extent[0] ?? 0
+value_max = value_extent[1] ?? 1
+
+colorScale = d3.scaleSequential()
+  .domain([value_min, value_max])
+  .interpolator(d3.interpolateYlOrRd)
+
+markerColor = v => v == null ? "#aaa" : colorScale(v)
+fmtVal = v => v == null ? "N/A" : (v >= 1000 ? v.toFixed(0) : v.toFixed(2)) + " mg/kg"
+
+{
+  const container = html`<div class="map-container"><div id="map"></div></div>`
+  yield container
+
+  if (!container._map) {
+    const map = L.map(container.querySelector("#map"), { zoomControl: true })
+      .setView([home_lat, home_lng], home_zoom)
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors"
+    }).addTo(map)
+
+    const HomeControl = L.Control.extend({
+      options: { position: "topleft" },
+      onAdd(map) {
+        const btn = L.DomUtil.create("a", "leaflet-home-button")
+        btn.innerHTML = '<i class="fa fa-expand" aria-hidden="true"></i>'
+        btn.title = "Reset view"
+        L.DomEvent.on(btn, "click", e => {
+          L.DomEvent.stopPropagation(e)
+          map.setView([home_lat, home_lng], home_zoom)
+        })
+        return btn
+      }
+    })
+    new HomeControl().addTo(map)
+
+    const LegendControl = L.Control.extend({
+      options: { position: "bottomright" },
+      onAdd() { const d = L.DomUtil.create("div", "legend"); d.id = "map-legend"; return d }
+    })
+    new LegendControl().addTo(map)
+
+    container._map = map
+    container._markers = L.layerGroup().addTo(map)
+  }
+
+  const { _map: map, _markers: markers } = container
+
+  const legendEl = map.getContainer().querySelector("#map-legend")
+  if (legendEl) {
+    legendEl.innerHTML = `
+      <div class="legend-title">${selected_element.label}</div>
+      <div style="font-size:11px;color:#555">${selected_fraction.label}, avg mg/kg</div>
+      <div class="legend-bar" style="background:linear-gradient(to right,#ffffb2,#fecc5c,#fd8d3c,#f03b20,#bd0026)"></div>
+      <div class="legend-labels">
+        <span>${fmtVal(value_min)}</span>
+        <span>${fmtVal(value_max)}</span>
+      </div>`
+  }
+
+  markers.clearLayers()
+  mutable clicked_point = null
+
+  for (const d of map_data) {
+    if (d.avg_value == null) continue
+    const circle = L.circleMarker([d.latitude, d.longitude], {
+      radius: 6, fillColor: markerColor(d.avg_value),
+      color: "#333", weight: 0.7, opacity: 1, fillOpacity: 0.85
+    })
+    circle.bindTooltip(
+      `<b>${selected_element.label}</b><br>${fmtVal(d.avg_value)}<br>(${selected_fraction.label})`,
+      { sticky: true })
+    circle.on("click", () => { mutable clicked_point = { lat: d.latitude, lon: d.longitude } })
+    markers.addLayer(circle)
+  }
+}
+
+map_data.length === 0
+  ? md`*No data for this selection.*`
+  : md`**${selected_element.label}** · ${selected_fraction.label} · **${map_data.length}** sites · mg/kg`
+```
+
+```{ojs}
+point_data = {
+  const p = clicked_point
+  if (!p) return []
+  return db.query(`
+    SELECT m.source AS Source,
+           m.value_std AS "Value (mg/kg)",
+           sub.depth_from AS "From (cm)",
+           sub.depth_to AS "To (cm)",
+           CAST(e.year AS TEXT) AS Year,
+           mt.method AS Method
+    FROM measurement m
+      JOIN subsample sub ON sub.subsample_id = m.subsample_id
+      JOIN event e       ON e.event_id       = sub.event_id
+      JOIN site si       ON si.site_id       = e.site_id
+      LEFT JOIN method mt ON mt.method_id    = m.method_id
+    WHERE m.symbol = '${selected_element.value}'
+      AND m.frac_class = '${selected_fraction.value}'
+      AND si.latitude = ${p.lat} AND si.longitude = ${p.lon}
+    ORDER BY e.year
+  `)
+}
+
+clicked_point
+  ? md`### ${selected_element.label} at (${clicked_point.lat.toFixed(3)}, ${clicked_point.lon.toFixed(3)})`
+  : md`*Click a point on the map to see its measurements.*`
+
+clicked_point ? Inputs.table(point_data, { layout: "auto" }) : html`<span></span>`
+```

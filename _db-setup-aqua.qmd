@@ -1,0 +1,10 @@
+```{ojs}
+//| output: false
+db_aqua = {
+  const StratumSQLite = await window._stratumSQLite;
+  return StratumSQLite.open(window._dbAqua, {
+    sqlJsPath: window._sqljsBase,
+    cacheKey:  "aquaculture-no@v0.1.0",
+  });
+}
+```

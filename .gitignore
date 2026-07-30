@@ -5,3 +5,6 @@
 .Rproj.user
 .Rhistory
 .RData
+
+# downloaded databases (fetched by download_resources.R)
+*.sqlite
