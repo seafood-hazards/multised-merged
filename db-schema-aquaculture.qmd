@@ -1,0 +1,52 @@
+---
+title: "DB Schema (Aquaculture)"
+subtitle: "The Norwegian aquaculture reference database"
+---
+
+```{css, echo=FALSE}
+th { white-space: nowrap; }
+```
+
+The aquaculture database (`aquaculture_no.sqlite`) is a single-table reference of
+Norwegian marine aquaculture sites, active and closed. It is paired with the merged
+database: each Norwegian sediment site carries its distance to the nearest farm
+(`site.dist_to_aquaculture`). The data cover **Norway only**, from the Norwegian
+Directorate of Fisheries site register. How the table is built (coordinate
+conversion, translation from Norwegian, salt-water filter) is documented on the
+[clean-analyses site](https://seafood-hazards.github.io/multised-clean/).
+
+## aquaculture
+
+One row per site. Salt-water and brackish sites are kept (pure freshwater dropped);
+3,743 sites in total (1,554 active, 2,189 closed).
+
+```{r}
+library(tibble)
+library(knitr)
+
+tribble(
+  ~Column,           ~Type,     ~Meaning,
+  "aqua_id",         "INTEGER", "Primary key.",
+  "loknr",           "INTEGER", "Site number in the Norwegian register.",
+  "name",            "TEXT",    "Site name (kept in Norwegian).",
+  "latitude",        "REAL",    "Latitude (WGS84), derived from the national grid (ETRS89 / UTM 33N).",
+  "longitude",       "REAL",    "Longitude (WGS84), derived from the national grid.",
+  "start_year",      "INTEGER", "Year the site was cleared.",
+  "end_year",        "INTEGER", "Year the site was withdrawn (NULL for active sites).",
+  "active",          "INTEGER", "1 for active, 0 for closed.",
+  "water_type",      "TEXT",    "salt, brackish, or fresh/salt.",
+  "capacity",        "REAL",    "Cleared (permitted) capacity, as reported.",
+  "capacity_unit",   "TEXT",    "Unit of capacity (tonnes, decare, count, ...).",
+  "capacity_tonnes", "REAL",    "Capacity converted to tonnes where the unit is a mass; NULL otherwise.",
+  "fish_types",      "TEXT",    "Species farmed, translated to English (rare species keep the Norwegian name).",
+  "placement",       "TEXT",    "sea or land.",
+  "county",          "TEXT",    "County (first name kept where the source is multilingual).",
+  "municipality",    "TEXT",    "Municipality (first name kept where the source is multilingual)."
+) |> kable()
+```
+
+::: {.callout-note}
+The aquaculture data are Norwegian only, so the paired `dist_to_aquaculture` column in
+the merged database is populated only for Norwegian sediment sites. When international
+aquaculture data become available the same column can be extended.
+:::

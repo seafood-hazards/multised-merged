@@ -1,0 +1,32 @@
+project:
+  type: website
+
+website:
+  title: "multised (merged)"
+  navbar:
+    search: true
+    right:
+      - icon: github
+        href: https://github.com/seafood-hazards/multised-merged
+        aria-label: GitHub
+    left:
+      - text: "Home"
+        href: index.qmd
+      - text: "DB Design"
+        menu:
+          - text: "DB Schema (Merged)"
+            href: db-schema-merged.qmd
+          - text: "DB Schema (Aquaculture)"
+            href: db-schema-aquaculture.qmd
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
+    df-print: kable
+
+execute:
+  echo: false
+  warning: false
+  message: false

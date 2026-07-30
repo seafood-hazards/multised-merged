@@ -1,0 +1,63 @@
+---
+title: "multised (merged)"
+subtitle: "The single merged marine-sediment database"
+---
+
+**multised** assembles a database of marine-sediment trace-element measurements from
+five external sources, harmonises them into a common schema, and progressively
+quality-controls the result. This site presents the **final product**: a single
+**merged** database that combines all five sources into one, together with the
+Norwegian **aquaculture** reference database paired with it.
+
+The earlier stages are documented on their own sites:
+
+- how each source is reshaped and quality-flagged (the **slim** stage) is on the
+  [slim site](https://seafood-hazards.github.io/multised-slim/);
+- how the flags are applied to build the **clean** databases, and the analyses
+  performed on them (grain size, Fe/Al normalisation, organic carbon, and the
+  cross-source merge itself) are on the
+  [clean-analyses site](https://seafood-hazards.github.io/multised-clean/).
+
+## The two databases
+
+```{r}
+library(tibble)
+library(knitr)
+
+tribble(
+  ~Database,                  ~Contents,
+  "multised_merged.sqlite",   "All five sources combined into one, with cross-source duplicates removed (one row per reading). Bulk and sieved kept as separate tracks.",
+  "aquaculture_no.sqlite",    "Norwegian marine aquaculture sites (active and closed), used to tag each Norwegian sediment site with its distance to the nearest farm."
+) |> kable()
+```
+
+## Pipeline generations
+
+The data moves through four generations, one SQLite database **per source** until the
+final merge:
+
+1. **pilot**: each source's raw files parsed into a per-source database. Documented on
+   the individual pilot sites.
+2. **slim**: every source reshaped into the same seven-table schema, then annotated
+   with quality-control flags. Documented on the
+   [slim site](https://seafood-hazards.github.io/multised-slim/).
+3. **clean**: the flags are applied (uncertain rows removed), units harmonised, and
+   grain-size split into its own table. Five per-source databases. Documented on the
+   [clean-analyses site](https://seafood-hazards.github.io/multised-clean/).
+4. **merged** *(this site)*: the five clean databases are combined into a single
+   `multised_merged.sqlite`, with cross-source duplicates removed.
+
+## What this site covers
+
+**DB Design**
+
+- [DB Schema (Merged)](./db-schema-merged.qmd): the table layout of the merged
+  database, with its entity-relationship diagram.
+- [DB Schema (Aquaculture)](./db-schema-aquaculture.qmd): the layout of the
+  aquaculture reference database.
+
+::: {.callout-note}
+How the merged database is built, step by step (union, deduplication, finalise) and
+how the aquaculture table is created are documented on the
+[clean-analyses site](https://seafood-hazards.github.io/multised-clean/).
+:::
