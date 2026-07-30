@@ -34,6 +34,8 @@ website:
             href: location-map.qmd
           - text: "Grain Size Map"
             href: grain-size-map.qmd
+          - text: "Aquaculture Map"
+            href: aquaculture-map.qmd
 
 format:
   html:

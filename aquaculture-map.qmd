@@ -1,0 +1,115 @@
+---
+title: "Aquaculture Map"
+subtitle: "Norwegian marine aquaculture sites (active and closed)"
+format:
+  html:
+    page-layout: full
+---
+
+```{=html}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+```
+
+The Norwegian marine aquaculture sites from `aquaculture_no.sqlite`, active and
+closed. Filter by status in the sidebar; hover a point for its details.
+
+{{< include _db-setup-aqua.qmd >}}
+
+```{ojs}
+//| output: false
+L = require("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js")
+
+home_lat = 65
+home_lng = 12
+home_zoom = 4
+
+ACTIVE_COL = "#4477AA"
+CLOSED_COL = "#CCBB44"
+
+statuses = [
+  { key: "all",    label: "All" },
+  { key: "active", label: "Active" },
+  { key: "closed", label: "Closed" }
+]
+
+all_farms = db_aqua.query(`
+  SELECT latitude, longitude, active, name, start_year, end_year, fish_types
+  FROM aquaculture
+  WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+`)
+```
+
+```{ojs}
+//| panel: sidebar
+viewof selected_status = Inputs.select(statuses, {
+  label: "Status:", format: d => d.label, value: statuses[0]
+})
+```
+
+```{ojs}
+//| panel: fill
+
+map_data = selected_status.key === "all"
+  ? all_farms
+  : all_farms.filter(d => d.active === (selected_status.key === "active" ? 1 : 0))
+
+{
+  const container = html`<div class="map-container"><div id="map"></div></div>`
+  yield container
+
+  if (!container._map) {
+    const map = L.map(container.querySelector("#map"), { zoomControl: true })
+      .setView([home_lat, home_lng], home_zoom)
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors"
+    }).addTo(map)
+
+    const HomeControl = L.Control.extend({
+      options: { position: "topleft" },
+      onAdd(map) {
+        const btn = L.DomUtil.create("a", "leaflet-home-button")
+        btn.innerHTML = '<i class="fa fa-expand" aria-hidden="true"></i>'
+        btn.title = "Reset view"
+        L.DomEvent.on(btn, "click", e => {
+          L.DomEvent.stopPropagation(e); map.setView([home_lat, home_lng], home_zoom)
+        })
+        return btn
+      }
+    })
+    new HomeControl().addTo(map)
+
+    const LegendControl = L.Control.extend({
+      options: { position: "bottomright" },
+      onAdd() { const d = L.DomUtil.create("div", "legend"); d.id = "map-legend"; return d }
+    })
+    new LegendControl().addTo(map)
+
+    container._map = map
+    container._markers = L.layerGroup().addTo(map)
+  }
+
+  const { _map: map, _markers: markers } = container
+  const legendEl = map.getContainer().querySelector("#map-legend")
+  if (legendEl) {
+    legendEl.innerHTML = `
+      <div class="legend-title">Aquaculture sites</div>
+      <div class="legend-row"><span class="legend-swatch" style="background:${ACTIVE_COL}"></span> active</div>
+      <div class="legend-row"><span class="legend-swatch" style="background:${CLOSED_COL}"></span> closed</div>`
+  }
+
+  markers.clearLayers()
+  for (const d of map_data) {
+    const years = d.end_year ? `${d.start_year ?? "?"}–${d.end_year}` : `${d.start_year ?? "?"}–`
+    const circle = L.circleMarker([d.latitude, d.longitude], {
+      radius: 4, fillColor: d.active === 1 ? ACTIVE_COL : CLOSED_COL,
+      color: "#333", weight: 0.5, opacity: 1, fillOpacity: 0.8
+    })
+    circle.bindTooltip(
+      `<b>${d.name ?? "(unnamed)"}</b><br>${d.active === 1 ? "active" : "closed"} · ${years}<br>${d.fish_types ?? ""}`,
+      { sticky: true })
+    markers.addLayer(circle)
+  }
+}
+
+md`**${selected_status.label}** · **${map_data.length}** aquaculture sites`
+```

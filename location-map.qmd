@@ -10,12 +10,11 @@ format:
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 ```
 
-The geographic context of the sediment sites: distance to coast, water depth, and
-distance to the nearest Norwegian aquaculture site, plus the aquaculture sites
-themselves. Pick a view in the sidebar.
+The geographic context of the sediment sites: water depth, distance to the coast, and
+distance to the nearest Norwegian aquaculture site. Pick an attribute in the sidebar.
+The aquaculture sites themselves are on the [Aquaculture Map](./aquaculture-map.qmd).
 
 {{< include _db-setup.qmd >}}
-{{< include _db-setup-aqua.qmd >}}
 
 ```{ojs}
 //| output: false
@@ -26,46 +25,30 @@ home_lng = 10
 home_zoom = 4
 
 views = [
-  { label: "Distance to coast",       kind: "site", column: "dist_to_coast",       unit: "km" },
-  { label: "Depth",                   kind: "site", column: "depth",               unit: "m" },
-  { label: "Distance to aquaculture", kind: "site", column: "dist_to_aquaculture", unit: "km" },
-  { label: "Aquaculture sites",       kind: "aqua" }
+  { label: "Distance to coast",       column: "dist_to_coast",       unit: "km" },
+  { label: "Depth",                   column: "depth",               unit: "m" },
+  { label: "Distance to aquaculture", column: "dist_to_aquaculture", unit: "km" }
 ]
-
-ACTIVE_COL = "#4477AA"
-CLOSED_COL = "#CCBB44"
 ```
 
 ```{ojs}
 //| panel: sidebar
 viewof selected_view = Inputs.select(views, {
-  label: "View:", format: d => d.label, value: views[0]
+  label: "Attribute:", format: d => d.label, value: views[0]
 })
 ```
 
 ```{ojs}
 //| panel: fill
 
-map_data = {
-  if (selected_view.kind === "site") {
-    return db.query(`
-      SELECT latitude, longitude, ${selected_view.column} AS val
-      FROM site
-      WHERE ${selected_view.column} IS NOT NULL
-        AND latitude IS NOT NULL AND longitude IS NOT NULL
-    `)
-  } else {
-    return db_aqua.query(`
-      SELECT latitude, longitude, active, name
-      FROM aquaculture
-      WHERE latitude IS NOT NULL AND longitude IS NOT NULL
-    `)
-  }
-}
+map_data = db.query(`
+  SELECT latitude, longitude, ${selected_view.column} AS val
+  FROM site
+  WHERE ${selected_view.column} IS NOT NULL
+    AND latitude IS NOT NULL AND longitude IS NOT NULL
+`)
 
-is_site = selected_view.kind === "site"
-
-value_extent = is_site ? d3.extent(map_data, d => d.val) : [0, 1]
+value_extent = d3.extent(map_data, d => d.val)
 value_min = value_extent[0] ?? 0
 value_max = value_extent[1] ?? 1
 
@@ -109,43 +92,25 @@ fmtVal = v => v == null ? "N/A" : `${v.toFixed(1)} ${selected_view.unit}`
 
   const { _map: map, _markers: markers } = container
   const legendEl = map.getContainer().querySelector("#map-legend")
-
   if (legendEl) {
-    if (is_site) {
-      const g = d3.range(0, 1.01, 0.25).map(t =>
-        d3.interpolateViridis(t)).join(",")
-      legendEl.innerHTML = `
-        <div class="legend-title">${selected_view.label}</div>
-        <div class="legend-bar" style="background:linear-gradient(to right,${g})"></div>
-        <div class="legend-labels"><span>${fmtVal(value_min)}</span><span>${fmtVal(value_max)}</span></div>`
-    } else {
-      legendEl.innerHTML = `
-        <div class="legend-title">Aquaculture sites</div>
-        <div class="legend-row"><span class="legend-swatch" style="background:${ACTIVE_COL}"></span> active</div>
-        <div class="legend-row"><span class="legend-swatch" style="background:${CLOSED_COL}"></span> closed</div>`
-    }
+    const g = d3.range(0, 1.01, 0.25).map(t => d3.interpolateViridis(t)).join(",")
+    legendEl.innerHTML = `
+      <div class="legend-title">${selected_view.label}</div>
+      <div class="legend-bar" style="background:linear-gradient(to right,${g})"></div>
+      <div class="legend-labels"><span>${fmtVal(value_min)}</span><span>${fmtVal(value_max)}</span></div>`
   }
 
   markers.clearLayers()
-
   for (const d of map_data) {
-    let fill, tip
-    if (is_site) {
-      if (d.val == null) continue
-      fill = colorScale(d.val)
-      tip = `${selected_view.label}: ${fmtVal(d.val)}`
-    } else {
-      fill = d.active === 1 ? ACTIVE_COL : CLOSED_COL
-      tip = `<b>${d.name ?? "(unnamed)"}</b><br>${d.active === 1 ? "active" : "closed"}`
-    }
+    if (d.val == null) continue
     const circle = L.circleMarker([d.latitude, d.longitude], {
-      radius: is_site ? 5 : 4, fillColor: fill,
+      radius: 5, fillColor: colorScale(d.val),
       color: "#333", weight: 0.6, opacity: 1, fillOpacity: 0.8
     })
-    circle.bindTooltip(tip, { sticky: true })
+    circle.bindTooltip(`${selected_view.label}: ${fmtVal(d.val)}`, { sticky: true })
     markers.addLayer(circle)
   }
 }
 
-md`**${selected_view.label}** · **${map_data.length}** ${is_site ? "sites" : "farms"}`
+md`**${selected_view.label}** · **${map_data.length}** sites`
 ```
