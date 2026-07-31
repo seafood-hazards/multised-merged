@@ -26,6 +26,8 @@ website:
         menu:
           - text: "Data Categories"
             href: data-categories.qmd
+          - text: "Outlier Flagging"
+            href: outlier-flagging.qmd
       - text: "Explore"
         menu:
           - text: "Merged Tables"
