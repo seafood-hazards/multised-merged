@@ -61,6 +61,12 @@ final merge:
 - [DB Schema (Aquaculture)](./db-schema-aquaculture.qmd): the layout of the
   aquaculture reference database.
 
+**Analyses** on the merged database:
+
+- [Data Categories](./data-categories.qmd): how many measurements each element
+  carries, split by fraction, covariate availability and layering, with the
+  analyses each subset supports.
+
 **Explore** browses the databases in the page, with no server (the SQLite files run
 in the browser via WebAssembly):
 

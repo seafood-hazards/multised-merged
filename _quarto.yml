@@ -22,6 +22,10 @@ website:
             href: db-schema-merged.qmd
           - text: "DB Schema (Aquaculture)"
             href: db-schema-aquaculture.qmd
+      - text: "Analyses"
+        menu:
+          - text: "Data Categories"
+            href: data-categories.qmd
       - text: "Explore"
         menu:
           - text: "Merged Tables"

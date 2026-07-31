@@ -15,6 +15,25 @@ for (f in dbs) {
   }
 }
 
+# ── Summary CSVs ───────────────────────────────────────────────────────────
+# Tidy count tables written by the sedimenter pipeline
+# (R/analysis/merged_summary/01_merged_data_summary.R) and read at render time
+# by the "Data Categories" page. Same release as the databases.
+csv_dir <- "data/merged_summary"
+dir.create(csv_dir, recursive = TRUE, showWarnings = FALSE)
+csvs <- c("merged_coverage_fraction.csv",
+          "merged_bulk_factors.csv",
+          "merged_layering.csv")
+for (f in csvs) {
+  dest <- file.path(csv_dir, f)
+  if (!file.exists(dest)) {
+    download.file(file.path(release, f), dest, mode = "wb")
+    message(f, " downloaded.")
+  } else {
+    message("Using existing ", dest)
+  }
+}
+
 # ── sql.js + stratum-sqlite ────────────────────────────────────────────────
 # All four files are downloaded once and served from the site.
 # sql-wasm.js and sql-wasm.wasm are the sql.js engine that stratum-sqlite uses.
