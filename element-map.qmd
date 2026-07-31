@@ -12,6 +12,9 @@ format:
 
 Average standardised concentration (mg/kg) per site for the selected element and
 sediment fraction. Bulk and sieved are kept apart: pick the fraction in the sidebar.
+Distributional outliers (mostly registration errors, see
+[Outlier Flagging](./outlier-flagging.qmd)) are excluded by default; untick the box to
+include them.
 
 {{< include _db-setup.qmd >}}
 
@@ -58,6 +61,10 @@ viewof selected_element = Inputs.select(elements, {
 viewof selected_fraction = Inputs.select(fractions, {
   label: "Fraction:", format: d => d.label, value: fractions[0]
 })
+
+viewof exclude_outliers = Inputs.toggle({
+  label: "Exclude outliers", value: true
+})
 ```
 
 ```{ojs}
@@ -73,6 +80,7 @@ map_data = db.query(`
     JOIN site si       ON si.site_id       = e.site_id
   WHERE m.symbol = '${selected_element.value}'
     AND m.frac_class = '${selected_fraction.value}'
+    ${exclude_outliers ? "AND m.outlier_flag IS NULL" : ""}
     AND si.latitude IS NOT NULL AND si.longitude IS NOT NULL
   GROUP BY si.latitude, si.longitude
 `)
@@ -157,7 +165,7 @@ fmtVal = v => v == null ? "N/A" : (v >= 1000 ? v.toFixed(0) : v.toFixed(2)) + " 
 
 map_data.length === 0
   ? md`*No data for this selection.*`
-  : md`**${selected_element.label}** · ${selected_fraction.label} · **${map_data.length}** sites · mg/kg`
+  : md`**${selected_element.label}** · ${selected_fraction.label} · **${map_data.length}** sites · mg/kg${exclude_outliers ? " · outliers excluded" : ""}`
 ```
 
 ```{ojs}
@@ -167,6 +175,7 @@ point_data = {
   return db.query(`
     SELECT m.source AS Source,
            m.value_std AS "Value (mg/kg)",
+           m.outlier_flag AS Outlier,
            sub.depth_from AS "From (cm)",
            sub.depth_to AS "To (cm)",
            CAST(e.year AS TEXT) AS Year,
