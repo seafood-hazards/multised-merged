@@ -1,0 +1,159 @@
+---
+title: "Data Categories"
+subtitle: "What the merged database supports, by fraction, covariate availability, and layering"
+---
+
+Before running analyses on the merged database, it helps to see what is actually
+there. The same trace element behaves very differently depending on how the
+sediment was sampled and what supporting data came with it, and not every
+analysis is possible on every measurement. This page counts the measurements per
+element, split by the factors that decide which analyses each subset can carry.
+
+The counts are produced upstream in the processing pipeline and read here from
+tidy CSVs, so the category definitions live in one script.
+
+## The factors
+
+Each measurement is classified by five factors:
+
+1. **Fraction**: whether the reading is on the **bulk** (whole) sediment or on a
+   **sieved** sub-fraction (<63 µm, the mud fraction, or <20 µm, finer still).
+   A coarse sieve isolates the fine, geochemically active material, so bulk and
+   sieved readings of the same element are not directly comparable and are kept
+   as separate tracks.
+2. **Grain size**: whether the sample carries grain-size composition, needed for
+   grain-size correction and mud-fraction work.
+3. **Normalisers (Fe, Al)**: whether iron and/or aluminium are available, the
+   lithogenic carriers used to normalise the target metals.
+4. **Organic carbon**: whether CORG/TOC is available, the organic-matter carrier.
+5. **Layering**: whether the sampling event is a **single** grab or core section
+   (one layer) or a **multi-layer / multi-core** event (a depth profile).
+
+Grain-size correction and Fe/Al normalisation are only meaningful on **bulk**
+samples, so factors 2 to 4 are tabulated for bulk only. Sieved fractions are
+split by layering alone.
+
+::: {.callout-note}
+Covariate availability (factors 2 to 4) is read from the pipeline's
+subsample-level "exist" flags. They mark that the measurand exists somewhere in
+that subsample and are fraction-agnostic, so a bulk row flagged as having Fe has
+Fe in the subsample but not necessarily in the bulk fraction itself. This is a
+planning view (which analyses are worth attempting); each analysis script matches
+the fraction exactly.
+:::
+
+```{r}
+#| label: setup
+library(knitr)
+
+read_summary <- function(f) {
+  d <- read.csv(file.path("data/merged_summary", f),
+                stringsAsFactors = FALSE, check.names = FALSE)
+  d$Category <- factor(tools::toTitleCase(d$category),
+                       levels = c("Target", "Reference", "Organic"))
+  d$Element  <- paste0(d$element_name, " (", d$symbol, ")")
+  d
+}
+```
+
+## Coverage by fraction
+
+How many measurements each element carries in each fraction. The bulk track
+dominates, but both sieved tracks carry thousands of target-metal readings, most
+of them Copper and Zinc.
+
+```{r}
+#| label: coverage
+cov <- read_summary("merged_coverage_fraction.csv")
+kable(
+  cov[order(cov$Category, cov$symbol),
+      c("Category", "Element", "bulk", "sieved63", "sieved20", "other", "total")],
+  col.names = c("Category", "Element", "Bulk", "Sieved <63 µm",
+                "Sieved <20 µm", "Other", "Total"),
+  row.names = FALSE, format.args = list(big.mark = ","))
+```
+
+The "Other" column holds a handful of readings sieved to unusual cutoffs (90 and
+500 µm) and is set aside.
+
+## Bulk sub-categories: covariate availability
+
+Within the bulk track, how many measurements come with each covariate. This is
+what decides whether an element can be grain-size corrected, Fe/Al normalised, or
+related to organic carbon.
+
+```{r}
+#| label: bulk-factors
+bf <- read_summary("merged_bulk_factors.csv")
+kable(
+  bf[order(bf$Category, bf$symbol),
+     c("Category", "Element", "bulk", "grain", "fe_or_al", "org")],
+  col.names = c("Category", "Element", "Bulk total", "With grain size",
+                "With Fe or Al", "With organic C"),
+  row.names = FALSE, format.args = list(big.mark = ","))
+```
+
+Coverage is uneven. Copper and Zinc have the most bulk readings but the smallest
+proportion with normalisers (roughly a quarter), because much of their data comes
+from monitoring programmes that did not measure Fe/Al. The less common metals
+(Cobalt, Manganese, Molybdenum, Selenium) are better supported, often measured on
+full geochemical suites. Organic carbon travels with Copper and Zinc far more
+often than the normalisers do.
+
+## Layering: single vs multi-layer / core
+
+Whether each measurement comes from a single grab or core section, or from a
+multi-layer / multi-core event (a depth profile). Multi-layer events open up
+downcore analyses; single events are the bulk of the surface-sediment data.
+
+```{r}
+#| label: layering
+lay <- read_summary("merged_layering.csv")
+kable(
+  lay[order(lay$Category, lay$symbol),
+      c("Category", "Element",
+        "bulk_single", "bulk_multi",
+        "sieved63_single", "sieved63_multi",
+        "sieved20_single", "sieved20_multi")],
+  col.names = c("Category", "Element",
+                "Bulk single", "Bulk multi",
+                "<63 single", "<63 multi",
+                "<20 single", "<20 multi"),
+  row.names = FALSE, format.args = list(big.mark = ","))
+```
+
+Most data is single-layer surface sediment. Multi-layer events are a meaningful
+minority of the bulk track (roughly a fifth for Copper and Zinc, more for Cobalt,
+Molybdenum and Selenium) but are rare in the sieved tracks, so downcore work is
+essentially a bulk-only option.
+
+## Suggested analytical approaches
+
+Reading the three tables together, the merged data splits into a few workable
+groups, each suiting a different analysis:
+
+- **Bulk, with grain size**: the largest analysable group. Supports the
+  **grain-size** analysis (mud fraction vs metal) and grain-size correction, the
+  first-line control on the target metals. Available for every target element,
+  strongest for Cobalt, Manganese and Selenium.
+- **Bulk, with Fe or Al**: supports **Fe/Al normalisation** (metal vs lithogenic
+  carrier), the standard geochemical baseline. Well covered for the full-suite
+  metals; for Copper and Zinc it is a large absolute count but a minority of their
+  readings, so normalised and un-normalised subsets should be reported separately.
+- **Bulk, with organic carbon**: supports the **organic-carbon** analysis (metal
+  vs CORG/TOC), the organic-matter carrier. Broadest covariate for Copper and
+  Zinc, so the natural control where normalisers are scarce.
+- **Bulk, multi-layer / core**: the subset for **downcore / depth-profile**
+  analyses (metal vs sediment depth). Bulk only in practice, best for Copper,
+  Zinc, Cobalt and Selenium.
+- **Sieved (<63 µm and <20 µm)**: supports a **bulk-versus-sieved comparison**
+  (how much the fine fraction concentrates each metal) and analyses run within a
+  single fraction. Mostly Copper, Zinc and Manganese; too sparse for Iodine and
+  Selenium.
+- **All fractions**: the spatial (**depth and distance to coast**) and temporal
+  (**sampling year**) settings apply to every measurement and are the context
+  layer for all of the above.
+
+The clean-database site runs the grain-size, Fe/Al, organic-carbon, spatial and
+temporal analyses per source; the same analyses can be repeated here on the merged
+database, now with the fraction and layering splits made explicit above.

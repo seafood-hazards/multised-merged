@@ -56,8 +56,8 @@ done
 ```
 
 They land in the repository root and are git-ignored. To build against the live
-pipeline output instead, copy (or symlink) the two files from the `sedimenter`
-project's `data/db/` directory.
+pipeline output instead, copy (or symlink) the two files from the processing
+pipeline's database directory.
 
 ### 3. Render the site
 
@@ -85,9 +85,8 @@ To point the site at a different database release, change the release tag in
 
 ## How the databases are built
 
-The merge pipeline (union, deduplication, finalise) and the aquaculture table live
-in the [`sedimenter`](https://github.com/seafood-hazards/sedimenter) project
-(`R/merge/`, `R/aquaculture/`); the merge steps are also documented on the
+The merge pipeline (union, deduplication, finalise) and the aquaculture table are
+built by a separate processing pipeline; the merge steps are also documented on the
 [clean-analyses site](https://seafood-hazards.github.io/multised-clean/).
 
 ## Repository layout
