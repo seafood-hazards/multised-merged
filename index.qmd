@@ -37,7 +37,12 @@ The data moves through four generations, one SQLite database **per source** unti
 final merge:
 
 1. **pilot**: each source's raw files parsed into a per-source database. Documented on
-   the individual pilot sites.
+   the individual pilot sites:
+   [Mareano](https://seafood-hazards.github.io/mareano-pilot/),
+   [Vannmiljø](https://seafood-hazards.github.io/vannmiljo-pilot/),
+   [ICES-DOME](https://seafood-hazards.github.io/ices-dome-pilot/),
+   [MUDAB](https://seafood-hazards.github.io/mudab-pilot/), and
+   [4Demon](https://seafood-hazards.github.io/4demon-pilot/).
 2. **slim**: every source reshaped into the same seven-table schema, then annotated
    with quality-control flags. Documented on the
    [slim site](https://seafood-hazards.github.io/multised-slim/).
