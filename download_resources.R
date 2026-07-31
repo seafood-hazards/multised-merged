@@ -16,14 +16,17 @@ for (f in dbs) {
 }
 
 # ── Summary CSVs ───────────────────────────────────────────────────────────
-# Tidy count tables written by the sedimenter pipeline
-# (R/analysis/merged_summary/01_merged_data_summary.R) and read at render time
-# by the "Data Categories" page. Same release as the databases.
+# Tidy tables written by the processing pipeline and read at render time by the
+# Analyses pages ("Data Categories" and "Outlier Flagging"). Same release as the
+# databases.
 csv_dir <- "data/merged_summary"
 dir.create(csv_dir, recursive = TRUE, showWarnings = FALSE)
 csvs <- c("merged_coverage_fraction.csv",
           "merged_bulk_factors.csv",
-          "merged_layering.csv")
+          "merged_layering.csv",
+          "merge_outlier_summary.csv",
+          "merge_outlier_hist.csv",
+          "merge_outlier_examples.csv")
 for (f in csvs) {
   dest <- file.path(csv_dir, f)
   if (!file.exists(dest)) {

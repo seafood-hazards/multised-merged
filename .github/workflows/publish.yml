@@ -41,6 +41,8 @@ jobs:
             any::rmarkdown
             any::knitr
             any::tibble
+            any::dplyr
+            any::ggplot2
 
       - name: Render site
         run: quarto render

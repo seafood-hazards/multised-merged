@@ -66,6 +66,9 @@ final merge:
 - [Data Categories](./data-categories.qmd): how many measurements each element
   carries, split by fraction, covariate availability and layering, with the
   analyses each subset supports.
+- [Outlier Flagging](./outlier-flagging.qmd): marking values that sit implausibly
+  far from their element's distribution (mostly registration errors), the soft
+  `outlier_flag` on the merged database.
 
 **Explore** browses the databases in the page, with no server (the SQLite files run
 in the browser via WebAssembly):
