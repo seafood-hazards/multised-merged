@@ -28,6 +28,10 @@ Every table except the shared `element` lookup gains two provenance columns, and
 - **`sieve_um_std`** / **`sieve_class`** on `measurement`: a canonical sieve cutoff
   (62 folded to 63) and its label (`<63um`, `<20um`), so like-cutoff sieved data can
   be compared. NULL for bulk.
+- **`outlier_flag`** on `measurement`: a soft distributional flag (`high` / `low` /
+  NULL) marking values implausibly far from their element's distribution, mostly
+  registration errors. A review marker, not a deletion. See
+  [Outlier Flagging](./outlier-flagging.qmd).
 
 The primary keys are renumbered to clean contiguous integers across the whole merged
 database (the source-prefixed keys survive only in the `src_*_id` columns). Bulk and
@@ -213,7 +217,8 @@ tribble(
   "sieve_um_std",      "REAL",    "Harmonised sieve cutoff (62 folded to 63), NULL for bulk.",
   "sieve_class",       "TEXT",    "Sieve label, e.g. '<63um' / '<20um', NULL for bulk.",
   "source",            "TEXT",    "Source database name.",
-  "src_measurement_id","TEXT",    "Original source-prefixed key (provenance)."
+  "src_measurement_id","TEXT",    "Original source-prefixed key (provenance).",
+  "outlier_flag",      "TEXT",    "Distributional outlier marker: 'high' / 'low', NULL = in distribution."
 ) |> kable()
 ```
 
