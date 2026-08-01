@@ -40,6 +40,8 @@ website:
             href: enrichment.qmd
           - text: "Depth and Coast"
             href: spatial.qmd
+          - text: "Sampling Year"
+            href: temporal.qmd
       - text: "Explore"
         menu:
           - text: "Merged Tables"
