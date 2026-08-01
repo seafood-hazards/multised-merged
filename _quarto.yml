@@ -36,6 +36,8 @@ website:
             href: organic-carbon.qmd
           - text: "Depth Profiles"
             href: depth-profile.qmd
+          - text: "Bulk vs Sieved"
+            href: enrichment.qmd
       - text: "Explore"
         menu:
           - text: "Merged Tables"
