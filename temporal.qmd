@@ -1,0 +1,113 @@
+---
+title: "Sampling Year"
+subtitle: "How enrichment and the normalisers relate to when the sample was taken"
+---
+
+```{css, echo=FALSE}
+th { white-space: nowrap; }
+```
+
+Does sampling year leave a trend after normalisation, the time analogue of the
+[Depth and Coast](./spatial.qmd) page? Two questions, on bulk samples, pooled across
+the merged database (distributional outliers dropped):
+
+- **(A, the point)** does the **enrichment** (metal / normaliser) trend over the
+  years? A ratio that falls with year would be a real improvement signal, declining
+  input relative to the lithogenic carrier; a flat ratio means there is no temporal
+  drift to see.
+- **(B, a check)** do the **normalisers and covariates** themselves (Al, Fe, organic
+  carbon, fines) trend with year? A drift here would mean the sampling or method mix
+  changed over time and would confound (A).
+
+Iron is the primary normaliser (best grain-size carrier in the
+[Fe/Al Normalisation](./normalisation.qmd) analysis). **This is an unbalanced
+observational series, not a fixed monitoring station**: the years 1975 to 2025 mix
+different sources, regions and methods, and which source dominates shifts by decade,
+so any trend is an association, not a station record.
+
+```{r}
+#| label: setup
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+
+tdir <- "data/merged_summary"
+rd <- function(f) read.csv(file.path(tdir, f), stringsAsFactors = FALSE,
+                           check.names = FALSE)
+enr  <- rd("merged_temporal_enrichment.csv")
+cov  <- rd("merged_temporal_covariate.csv")
+yr   <- rd("merged_temporal_yearly.csv")
+
+elem_levels <- c("CO", "CU", "MN", "MO", "SE", "ZN")
+theme_set(theme_minimal(base_size = 12))
+```
+
+## A. Enrichment versus sampling year
+
+Spearman correlation of the metal / iron ratio with year (bulk, pooled, at least 50
+per group). **Negative means enrichment declines over time.** The trends are **weak**:
+most sit within roughly plus or minus 0.2. Cobalt, copper, zinc and manganese drift
+gently down, consistent with slowly falling inputs; molybdenum is flat to rising
+(redox, not pollution). Selenium shows the steepest decline, but over a short, thin
+run of years (see the figure), so it is the least robust of the set.
+
+```{r}
+#| label: a-table
+enr |>
+  filter(Source == "All (pooled)") |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  select(Element, normaliser, rho) |>
+  pivot_wider(names_from = normaliser, values_from = rho) |>
+  transmute(Element, `rho vs year (Fe-norm)` = Fe, `rho vs year (Al-norm)` = Al) |>
+  arrange(Element) |>
+  kable(caption = "Metal / normaliser enrichment vs year (pooled Spearman rho).")
+```
+
+The iron and aluminium columns disagree in sign for some metals (zinc falls on iron
+but rises on aluminium). That is not a real reversal but the unbalanced series showing
+through: the iron-normalisable and aluminium-normalisable samples are different
+populations, drawn from different sources and decades, so the two normalisers see
+different slices of time. It is another reason to read these as weak associations.
+
+```{r}
+#| label: a-fig
+#| fig-cap: "Yearly median iron-normalised enrichment by element (log y, loess smooth). Point size scales with the number of samples that year."
+#| fig-width: 8.5
+#| fig-height: 5
+yr |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  ggplot(aes(year, median_ratio_FE)) +
+  geom_point(aes(size = n), alpha = 0.4, colour = "#4477AA") +
+  geom_smooth(method = "loess", formula = y ~ x, colour = "#AA3377", se = FALSE,
+              linewidth = 0.7) +
+  scale_y_log10() +
+  scale_size_area(max_size = 3, guide = "none") +
+  facet_wrap(~ Element, scales = "free_y") +
+  labs(x = "sampling year", y = "median metal / Fe (log)")
+```
+
+## B. Do the normalisers themselves drift with year?
+
+Spearman correlation of aluminium, iron, organic carbon and fines with year (pooled).
+Reassuringly, all four are close to flat (only fines drifts slightly, as sampling
+leaned marginally toward muddier sites over time). Because the covariates do not drift,
+the weak enrichment trends in A are not a normaliser-drift artefact; they are what
+little temporal signal the pooled data carries.
+
+```{r}
+#| label: b-table
+cov |>
+  transmute(Factor = factor, `rho vs year` = rho, n) |>
+  arrange(Factor) |>
+  kable(format.args = list(big.mark = ","))
+```
+
+::: {.callout-note}
+The temporal signal is weak and the series is unbalanced, so this page is best read as
+context rather than a trend record: it says there is no strong secular drift in the
+normalised metals once outliers are removed, not that inputs did or did not change at
+any given place. A real trend analysis would fix the station and method, a monitoring
+design this merged, opportunistic dataset does not provide. Iodine has too few
+year-tagged bulk samples to report.
+:::
