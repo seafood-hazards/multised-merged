@@ -18,7 +18,8 @@ for (f in dbs) {
 # ── Summary CSVs ───────────────────────────────────────────────────────────
 # Tidy tables written by the processing pipeline and read at render time by the
 # Analyses pages ("Data Categories", "Outlier Flagging", "Grain Size", "Fe/Al
-# Normalisation", "Organic Carbon"). Same release as the databases.
+# Normalisation", "Organic Carbon", "Depth Profiles"). Same release as the
+# databases.
 csv_dir <- "data/merged_summary"
 dir.create(csv_dir, recursive = TRUE, showWarnings = FALSE)
 csvs <- c("merged_coverage_fraction.csv",
@@ -39,7 +40,11 @@ csvs <- c("merged_coverage_fraction.csv",
           "merged_organic_availability.csv",
           "merged_organic_distribution.csv",
           "merged_organic_correlation.csv",
-          "merged_organic_pairs.csv")
+          "merged_organic_pairs.csv",
+          "merged_depthprofile_trends.csv",
+          "merged_depthprofile_enrichment.csv",
+          "merged_depthprofile_pooled.csv",
+          "merged_depthprofile_core_rho.csv")
 for (f in csvs) {
   dest <- file.path(csv_dir, f)
   if (!file.exists(dest)) {

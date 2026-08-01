@@ -1,0 +1,141 @@
+---
+title: "Depth Profiles"
+subtitle: "How the target metals change downcore, within multi-layer sediment cores"
+---
+
+```{css, echo=FALSE}
+th { white-space: nowrap; }
+```
+
+Some sampling events are **cores**, sliced into several depth layers rather than a
+single surface grab. Reading a metal down through a core separates recent input from
+the natural background beneath it: a metal that concentrates in the top slices and
+falls with depth is **surface-enriched**, the fingerprint of recent (often
+anthropogenic) deposition, while a flat or rising profile points to a stable or
+buried source, or to diagenetic remobilisation.
+
+This analysis has no per-source clean counterpart: it needs the merged database's
+multi-layer events (`n_layers > 1`). Because the absolute concentration differs
+enormously between sites, profiles are compared in **relative** terms, both measures
+cancelling a site's baseline level:
+
+- the **within-core trend**, a rank correlation (Spearman rho) of concentration
+  against layer midpoint depth (negative = falls with depth = surface-enriched);
+- each measurement divided by **its own core's median**, pooled across cores into an
+  average downcore shape.
+
+Bulk samples only; distributional outliers dropped; depth is the subsample interval
+midpoint.
+
+```{r}
+#| label: setup
+library(dplyr)
+library(ggplot2)
+library(knitr)
+
+ddir <- "data/merged_summary"
+rd <- function(f) read.csv(file.path(ddir, f), stringsAsFactors = FALSE,
+                           check.names = FALSE)
+trends <- rd("merged_depthprofile_trends.csv")
+enrich <- rd("merged_depthprofile_enrichment.csv")
+pooled <- rd("merged_depthprofile_pooled.csv")
+crho   <- rd("merged_depthprofile_core_rho.csv")
+
+elem_levels <- c("CO", "CU", "MN", "MO", "SE", "ZN")
+bin_levels  <- c("0-2", "2-5", "5-10", "10-20", "20-40", ">40")
+lev <- elem_levels[elem_levels %in% unique(trends$symbol)]
+theme_set(theme_minimal(base_size = 12))
+```
+
+## 1. Within-core trend
+
+The Spearman correlation of concentration with depth, computed per core (cores with
+at least three layers), then summarised per element. A negative median rho, and a
+high share of cores decreasing with depth, mark surface enrichment.
+
+```{r}
+#| label: trend-table
+trends |>
+  mutate(Element = factor(symbol, levels = lev)) |>
+  arrange(Element) |>
+  select(Element, n_cores, median_rho, pct_decrease, pct_increase, pct_flat) |>
+  kable(col.names = c("Element", "Cores", "Median rho", "% decreasing",
+                      "% increasing", "% flat"),
+        format.args = list(big.mark = ","))
+```
+
+**Manganese** is the clearest case: its median rho is strongly negative and most of
+its cores fall with depth. This is diagenetic, manganese oxides precipitate at the
+oxic surface and dissolve below, concentrating Mn near the top. **Copper** and
+**Zinc** are more moderately surface-enriched (about half their cores decrease), the
+pattern expected from recent deposition in a subset of contaminated cores.
+**Cobalt** and **Molybdenum** lean the other way, richer at depth: molybdenum in
+particular accumulates in the reducing sediment below the surface, so it reads as a
+redox proxy rather than a recent-input tracer. **Selenium** shows no downcore
+structure.
+
+```{r}
+#| label: rho-fig
+#| fig-cap: "Distribution of within-core trend (Spearman rho) per element. Below the dashed line = surface-enriched cores."
+#| fig-width: 7.5
+#| fig-height: 4
+crho |>
+  mutate(Element = factor(symbol, levels = lev)) |>
+  ggplot(aes(Element, rho)) +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_boxplot(fill = "#4477AA", alpha = 0.6, outlier.size = 0.5,
+               outlier.alpha = 0.3) +
+  labs(x = NULL, y = "within-core rho (concentration vs depth)")
+```
+
+## 2. Surface versus deep enrichment
+
+A second, simpler view: the ratio of the shallowest layer's concentration to the
+deepest layer's, per core (cores with at least two layers). Above 1 means
+surface-enriched. Manganese stands out again (median 1.7, four cores in five higher
+at the surface); copper and zinc are enriched in just over half their cores.
+
+```{r}
+#| label: enrich-table
+enrich |>
+  mutate(Element = factor(symbol, levels = lev)) |>
+  arrange(Element) |>
+  select(Element, n_cores, median_ratio, p25, p75, pct_surf_higher) |>
+  kable(col.names = c("Element", "Cores", "Median surf/deep", "P25", "P75",
+                      "% surface higher"),
+        format.args = list(big.mark = ","))
+```
+
+## 3. Average downcore shape
+
+Each measurement relative to its own core's median, pooled by depth bin. Pooling
+levels flattens the median profile (most cores are near-uniform, and the enriched
+minority is diluted), so the curves stay close to 1; the interquartile ribbon shows
+where the enriched cores pull the spread. Manganese carries the widest near-surface
+spread, consistent with its strong but variable surface enrichment.
+
+```{r}
+#| label: pooled-fig
+#| fig-cap: "Relative concentration (value / core median) against depth, pooled across cores. Line = median, ribbon = interquartile range. Depth axis inverted."
+#| fig-width: 8.5
+#| fig-height: 5
+pooled |>
+  mutate(Element = factor(symbol, levels = lev)) |>
+  ggplot(aes(bin_center, median_rel)) +
+  geom_ribbon(aes(ymin = p25, ymax = p75), fill = "#4477AA", alpha = 0.2) +
+  geom_line(colour = "#4477AA") +
+  geom_point(size = 1, colour = "#4477AA") +
+  geom_hline(yintercept = 1, linetype = "dashed", colour = "grey60") +
+  scale_x_reverse(breaks = c(1, 3.5, 7.5, 15, 30, 55), labels = bin_levels) +
+  coord_flip() +
+  facet_wrap(~ Element, scales = "free_x") +
+  labs(x = "depth (cm, midpoint)", y = "relative concentration (value / core median)")
+```
+
+::: {.callout-note}
+Surface enrichment here is a population summary, not a per-site verdict: an
+individual core can be enriched, buried or flat regardless of its element's average.
+The trend is strongest and most consistent for manganese (diagenetic), moderate and
+input-driven for copper and zinc, and reversed for molybdenum (redox accumulation at
+depth). Iodine has too few multi-layer cores to report.
+:::
