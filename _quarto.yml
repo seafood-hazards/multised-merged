@@ -28,6 +28,8 @@ website:
             href: data-categories.qmd
           - text: "Outlier Flagging"
             href: outlier-flagging.qmd
+          - text: "Grain Size"
+            href: grain-size.qmd
       - text: "Explore"
         menu:
           - text: "Merged Tables"

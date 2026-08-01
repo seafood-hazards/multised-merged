@@ -42,6 +42,7 @@ jobs:
             any::knitr
             any::tibble
             any::dplyr
+            any::tidyr
             any::ggplot2
 
       - name: Render site
