@@ -1,0 +1,131 @@
+---
+title: "Depth and Coast"
+subtitle: "How the geographic setting relates to enrichment and the normalisers"
+---
+
+```{css, echo=FALSE}
+th { white-space: nowrap; }
+```
+
+Do the geographic attributes **depth** and **distance to coast** leave a gradient
+after normalisation? Two questions, on bulk samples, pooled across the merged database
+(distributional outliers dropped):
+
+- **(A, the point)** does the **enrichment** (metal / normaliser) change offshore and
+  with depth? A ratio that falls offshore is the coastal-pollution gradient a pristine
+  background rests on: cleaner offshore sediment. A flat ratio means normalisation
+  already absorbed the spatial structure, so the metal was lithogenic, not enriched.
+- **(B, a check)** do the **normalisers and covariates** themselves (Al, Fe, organic
+  carbon, fines) vary with depth and distance to coast? They do, via grain size,
+  which is why the raw metal does, and why (A) works on the ratio.
+
+Iron is the primary normaliser here (it carried the grain-size signal best in the
+[Fe/Al Normalisation](./normalisation.qmd) analysis); aluminium is shown alongside
+because the choice turns out to matter spatially.
+
+```{r}
+#| label: setup
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+
+sdir <- "data/merged_summary"
+rd <- function(f) read.csv(file.path(sdir, f), stringsAsFactors = FALSE,
+                           check.names = FALSE)
+enr <- rd("merged_spatial_enrichment.csv")
+cov <- rd("merged_spatial_covariate.csv")
+prs <- rd("merged_spatial_pairs.csv")
+
+elem_levels <- c("CO", "CU", "MN", "MO", "SE", "ZN")
+theme_set(theme_minimal(base_size = 12))
+```
+
+## A. Enrichment versus depth and distance to coast
+
+Spearman correlation of the metal / normaliser ratio with distance to coast and with
+depth (bulk, pooled, at least 50 per group). **Negative means the ratio falls offshore
+/ with depth: cleaner offshore.**
+
+```{r}
+#| label: a-table
+enr |>
+  filter(Source == "All (pooled)", normaliser == "Fe") |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  select(Element, variable, rho) |>
+  pivot_wider(names_from = variable, values_from = rho) |>
+  transmute(Element, `rho vs coast` = dist_to_coast, `rho vs depth` = depth) |>
+  arrange(Element) |>
+  kable(caption = "Metal / Fe enrichment vs geography (pooled Spearman rho).")
+```
+
+Iron-normalised, **zinc shows a steep coastal gradient** (its enrichment falls sharply
+offshore), copper and manganese a milder one, while **cobalt is flat**: cobalt is
+purely lithogenic, so Fe-normalisation leaves no spatial residual, exactly the null
+case. Molybdenum and selenium also fall offshore, but through their organic / redox
+affinity (organic carbon is higher near the coast) rather than metal pollution.
+
+```{r}
+#| label: a-scatter
+#| fig-cap: "Iron-normalised enrichment against distance to coast, pooled (log y, linear fit). Zinc and copper fall offshore; cobalt is flat."
+#| fig-width: 8
+#| fig-height: 3
+prs |>
+  filter(symbol %in% c("ZN", "CU", "CO"),
+         !is.na(ratio_FE), ratio_FE > 0, !is.na(dist_to_coast)) |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  ggplot(aes(dist_to_coast, ratio_FE)) +
+  geom_point(alpha = 0.06, size = 0.4, colour = "#4477AA") +
+  geom_smooth(method = "lm", formula = y ~ x, colour = "#AA3377", se = FALSE) +
+  scale_y_log10() +
+  facet_wrap(~ Element, scales = "free_y") +
+  labs(x = "distance to coast (km)", y = "metal / Fe (log)")
+```
+
+### The normaliser choice matters spatially
+
+The same zinc enrichment looks completely different depending on the normaliser: on
+iron the offshore gradient is strong, but on aluminium it nearly vanishes. That is
+because aluminium itself declines offshore (see B below), so dividing by it cancels
+the coastal signal, whereas iron is roughly flat against the coast and preserves it.
+Iron is therefore the better normaliser for reading the coastal-pollution gradient.
+
+```{r}
+#| label: a-fe-vs-al
+enr |>
+  filter(Source == "All (pooled)", variable == "dist_to_coast",
+         symbol %in% c("CU", "ZN", "CO")) |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  select(Element, normaliser, rho) |>
+  pivot_wider(names_from = normaliser, values_from = rho) |>
+  transmute(Element, `rho vs coast (Fe-norm)` = Fe, `rho vs coast (Al-norm)` = Al) |>
+  arrange(Element) |>
+  kable()
+```
+
+## B. Do the normalisers themselves vary with depth and coast?
+
+Spearman correlation of aluminium, iron, organic carbon and fines with depth and
+distance to coast (pooled). There is clear spatial structure: fines and iron increase
+into the deeper, muddier offshore basins, while aluminium and organic carbon decline
+offshore. This confirms why the raw metals carry a spatial signal, and why aluminium,
+declining offshore, masks the coastal enrichment that iron reveals.
+
+```{r}
+#| label: b-table
+cov |>
+  select(factor, variable, rho) |>
+  pivot_wider(names_from = variable, values_from = rho) |>
+  transmute(Factor = factor, `rho vs coast` = dist_to_coast, `rho vs depth` = depth) |>
+  arrange(Factor) |>
+  kable()
+```
+
+::: {.callout-note}
+Depth and distance to coast are strongly collinear (offshore is deeper) and both
+co-vary with grain size, so these are associations, not isolated effects; separating
+them needs a multivariate model, a later step. Depth is modelled (GEBCO) and absent on
+a few land-rounded sites. The offshore decline in iron-normalised enrichment (clearest
+for zinc and copper) means the most enriched sediment sits near the coast and the
+offshore floor is the natural background candidate.
+:::
