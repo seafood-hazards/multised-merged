@@ -1,0 +1,117 @@
+---
+title: "Bulk vs Sieved"
+subtitle: "How much sieving to the fine fraction concentrates each metal"
+---
+
+```{css, echo=FALSE}
+th { white-space: nowrap; }
+```
+
+Sieving sediment to a fine cutoff (<63 µm mud, or <20 µm finer still) discards the
+coarse, metal-poor grains, so a sieved analysis reads higher than a bulk (whole
+sample) one for the same metal. The EFSA specification warns that the two are not
+directly comparable; this page quantifies the **enrichment factor** (sieved / bulk)
+so the tracks can be related.
+
+The naive way to measure it, comparing the pooled median sieved value to the pooled
+median bulk value, is **confounded by location**: sieved samples tend to come from
+muddier, often more contaminated places, so a pooled ratio blends the sieving effect
+with a site-selection effect. The stronger measure is **paired within site**: at a
+site that carries both a bulk and a sieved value for the same element, their ratio is
+a direct enrichment factor with location held fixed. This page leads with the paired
+result and shows the pooled one alongside, because the gap between them is itself the
+finding.
+
+```{r}
+#| label: setup
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+
+edir <- "data/merged_summary"
+rd <- function(f) read.csv(file.path(edir, f), stringsAsFactors = FALSE,
+                           check.names = FALSE)
+paired <- rd("merged_enrichment_paired.csv")
+pairs  <- rd("merged_enrichment_pairs.csv")
+pooled <- rd("merged_enrichment_pooled.csv")
+
+elem_levels  <- c("CO", "CU", "MN", "MO", "SE", "ZN")
+cut_levels   <- c("<63um", "<20um")
+lev <- elem_levels[elem_levels %in% unique(paired$symbol)]
+theme_set(theme_minimal(base_size = 12))
+```
+
+## 1. Within-site enrichment factor
+
+At sites carrying both fractions of the same element, the ratio of the sieved value
+to the bulk value (at least 15 paired sites). Ratios are skewed, so summarised by
+median and interquartile range. Enrichment is **modest**: medians sit around 1.0 to
+1.4, and the finer <20 µm cutoff concentrates more than the <63 µm one, as expected.
+
+```{r}
+#| label: paired-table
+paired |>
+  mutate(Element = factor(symbol, levels = lev),
+         cutoff = factor(cutoff, levels = cut_levels)) |>
+  arrange(Element, cutoff) |>
+  select(Element, cutoff, n_sites, median_ratio, p25, p75, geomean, pct_enriched) |>
+  kable(col.names = c("Element", "Sieve", "Paired sites", "Median", "P25", "P75",
+                      "Geomean", "% enriched"),
+        format.args = list(big.mark = ","))
+```
+
+```{r}
+#| label: paired-fig
+#| fig-cap: "Within-site enrichment factor (sieved / bulk) per element and cutoff (log scale). Dashed line = no enrichment (ratio 1)."
+#| fig-width: 8
+#| fig-height: 4
+pairs |>
+  mutate(Element = factor(symbol, levels = lev),
+         cutoff = factor(cutoff, levels = cut_levels)) |>
+  ggplot(aes(Element, ratio, fill = cutoff)) +
+  geom_hline(yintercept = 1, linetype = "dashed", colour = "grey50") +
+  geom_boxplot(alpha = 0.6, outlier.size = 0.4, outlier.alpha = 0.25) +
+  scale_y_log10() +
+  scale_fill_manual(values = c("<63um" = "#CCBB44", "<20um" = "#228833")) +
+  labs(x = NULL, y = "enrichment factor (sieved / bulk, log)", fill = "sieve")
+```
+
+## 2. Paired versus pooled
+
+The pooled median-to-median ratio (all bulk and all sieved data, not matched by site)
+tells a much stronger story than the paired one, and that difference is the location
+confounding at work. For manganese and zinc the pooled <20 µm ratio is three to four
+times, but the honest within-site factor is under 1.5: most of the apparent
+"enrichment" is that sieved samples were taken in finer, richer sediment to begin
+with.
+
+```{r}
+#| label: compare-table
+pool_long <- pooled |>
+  transmute(symbol,
+            `<63um` = ratio_s63,
+            `<20um` = ratio_s20) |>
+  pivot_longer(c(`<63um`, `<20um`), names_to = "cutoff", values_to = "pooled_ratio")
+
+paired |>
+  select(symbol, cutoff, median_ratio) |>
+  inner_join(pool_long, by = c("symbol", "cutoff")) |>
+  mutate(Element = factor(symbol, levels = lev),
+         cutoff = factor(cutoff, levels = cut_levels)) |>
+  arrange(Element, cutoff) |>
+  transmute(Element, Sieve = cutoff,
+            `Within-site` = median_ratio,
+            `Pooled` = pooled_ratio,
+            `Pooled / paired` = round(pooled_ratio / median_ratio, 1)) |>
+  kable(format.args = list(big.mark = ","))
+```
+
+::: {.callout-note}
+The practical message: a bulk-to-sieved conversion built on pooled medians would
+over-correct badly. The within-site factors here (roughly 1.1 to 1.5, larger for the
+finer cutoff) are the defensible starting point, though they still carry a wide
+spread from site to site, so bulk and sieved are best kept as separate tracks and
+converted only with care. Molybdenum and selenium have too few paired sites to report
+and are set aside; iodine has none.
+:::
