@@ -38,6 +38,8 @@ website:
             href: depth-profile.qmd
           - text: "Bulk vs Sieved"
             href: enrichment.qmd
+          - text: "Depth and Coast"
+            href: spatial.qmd
       - text: "Explore"
         menu:
           - text: "Merged Tables"
