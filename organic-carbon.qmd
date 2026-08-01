@@ -1,0 +1,155 @@
+---
+title: "Organic Carbon"
+subtitle: "Relating the target metals to total organic carbon, pooled across the merged database"
+---
+
+```{css, echo=FALSE}
+th { white-space: nowrap; }
+```
+
+Trace metals bind to organic matter, so total organic carbon (CORG, reported as TOC
+in the EFSA spec) is a third control on their concentration alongside grain size and
+the Fe/Al normalisers. Where a metal tracks organic carbon but not iron or aluminium,
+it is organically rather than lithogenically controlled.
+
+This is the merged-database counterpart of the per-source organic-carbon analysis on
+the clean databases: run once on the single merged database (duplicates removed), so
+the four sources that carry organic carbon are **pooled** into one estimate per
+element (a per-source breakdown is kept alongside). Whole-sample organic carbon is
+CORG (all source TOC was harmonised to it earlier); the fines-normalised TOC63 is a
+different measurand and is not used here. Each target is paired with the CORG on the
+**same subsample and same (bulk) fraction**; distributional outliers (see
+[Outlier Flagging](./outlier-flagging.qmd)) are dropped. CORG is converted from mg/kg
+to percent. All depths are kept, reported by the EFSA depth bands.
+
+```{r}
+#| label: setup
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+
+odir <- "data/merged_summary"
+rd <- function(f) read.csv(file.path(odir, f), stringsAsFactors = FALSE,
+                           check.names = FALSE)
+avail <- rd("merged_organic_availability.csv")
+dist  <- rd("merged_organic_distribution.csv")
+corr  <- rd("merged_organic_correlation.csv")
+pairs <- rd("merged_organic_pairs.csv")
+
+elem_levels <- c("CO", "CU", "I", "MN", "MO", "SE", "ZN")
+band_levels <- c("0-5", "5-40", ">40", "unknown")
+src_levels  <- c("All (pooled)", "Mareano", "Vannmiljø", "ICES-DOME", "MUDAB")
+theme_set(theme_minimal(base_size = 12))
+```
+
+## 1. Organic carbon coverage
+
+How much of the bulk target data carries a co-located CORG value (same subsample), by
+element and depth band. Coverage is broad: notably Copper and Zinc, normalisable on
+Fe/Al only about a quarter of the time, carry organic carbon for well over half their
+readings, so CORG is the practical control for them where a normaliser is missing.
+
+```{r}
+#| label: avail-table
+avail |>
+  mutate(Element = factor(symbol, levels = elem_levels),
+         band = factor(band, levels = band_levels)) |>
+  filter(band != "unknown") |>
+  arrange(Element, band) |>
+  select(Element, band, n_target, `% with CORG` = pct_CORG) |>
+  kable(col.names = c("Element", "Depth band (cm)", "Bulk targets", "% with CORG"),
+        format.args = list(big.mark = ","))
+```
+
+## 2. Organic carbon content (%)
+
+The organic carbon percentage (bulk subsamples), pooled by depth band. Values are
+typical for marine sediment (around 1 to 3 %), with organic-rich outliers up to
+tens of percent.
+
+```{r}
+#| label: dist-table
+dist |>
+  mutate(band = factor(band, levels = band_levels)) |>
+  filter(band != "unknown") |>
+  arrange(band) |>
+  select(band, n_subsamples, `median %` = median, p25, p75, `max %` = max) |>
+  kable(col.names = c("Depth band (cm)", "Subsamples", "Median %", "P25", "P75",
+                      "Max %"),
+        format.args = list(big.mark = ","))
+```
+
+## 3. Which metals track organic carbon?
+
+The r-squared of a log-log fit of metal against CORG (bulk, at least 30 pairs). The
+pooled result reads directly against the [Fe/Al normalisation](./normalisation.qmd)
+page:
+
+- **Molybdenum tracks organic carbon** (r-squared 0.27) though it did **not**
+  normalise on Fe or Al: it is redox / organic controlled, so CORG is its control,
+  not a lithogenic normaliser.
+- **Copper and Zinc** associate with organic carbon (about 0.30), comparable to their
+  iron fit, and with far broader coverage, so organic carbon is their more practical
+  baseline.
+- **Cobalt and Manganese**, strong on iron, are weak here: lithogenic, not organic.
+- **Selenium** tracks nothing pooled (grain size, Fe/Al, and now CORG all near zero),
+  so it resists a simple single-covariate baseline.
+
+```{r}
+#| label: strength-table
+corr |>
+  filter(Source == "All (pooled)") |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  arrange(Element) |>
+  transmute(Element, n, `r2 (CORG)` = r2, slope) |>
+  kable(format.args = list(big.mark = ","))
+```
+
+```{r}
+#| label: strength-fig
+#| fig-cap: "Log-log metal to CORG fit strength (r-squared), pooled and per source (bulk)."
+#| fig-width: 8.5
+#| fig-height: 4.5
+corr |>
+  filter(Source %in% c("All (pooled)", "Mareano", "ICES-DOME", "Vannmiljø")) |>
+  mutate(Element = factor(symbol, levels = elem_levels),
+         Source = factor(Source, levels = src_levels)) |>
+  ggplot(aes(Element, r2)) +
+  geom_col(fill = "#228833") +
+  facet_wrap(~ Source) +
+  labs(x = NULL, y = "r-squared (log-log)") +
+  ylim(0, 1)
+```
+
+## 4. The organic relationship
+
+For the organic-associated metals, concentration rises with organic carbon. Pooled
+across sources and outlier-free, the trend is clearest for copper, zinc and
+molybdenum.
+
+```{r}
+#| label: scatter-fig
+#| fig-cap: "Bulk target concentration against organic carbon, pooled across sources (log y, linear fit)."
+#| fig-width: 8
+#| fig-height: 3.2
+pairs |>
+  filter(symbol %in% c("CU", "ZN", "MO"),
+         !is.na(corg_pct), corg_pct > 0, value_std > 0) |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  ggplot(aes(corg_pct, value_std)) +
+  geom_point(alpha = 0.08, size = 0.5, colour = "#228833") +
+  geom_smooth(method = "lm", formula = y ~ x, colour = "#AA3377", se = FALSE) +
+  scale_x_log10() +
+  scale_y_log10() +
+  facet_wrap(~ Element, scales = "free_y") +
+  labs(x = "organic carbon (%, log)", y = "concentration (mg/kg, log)")
+```
+
+::: {.callout-note}
+Read together with the [Fe/Al Normalisation](./normalisation.qmd) page, the three
+controls sort the metals: Cobalt and Manganese are lithogenic (iron), Molybdenum is
+organic (CORG), and Copper and Zinc respond to both. This split guides which control
+to use per element when defining a local background. Iodine and Selenium remain sparse
+or unresponsive and need separate treatment.
+:::
