@@ -1,0 +1,198 @@
+---
+title: "Grain Size"
+subtitle: "The bulk grain-size control on the target metals, pooled across the merged database"
+---
+
+```{css, echo=FALSE}
+th { white-space: nowrap; }
+```
+
+Trace-element concentrations in sediment depend strongly on grain size: finer
+material concentrates metals, so a **sieved <63 µm** analysis is not comparable to
+a **bulk** (whole-sample) one. This page asks the same question as the per-source
+grain-size analysis on the clean databases, but on the single merged database,
+where cross-source duplicates are already removed. So it **pools** the four sources
+that carry grain size (Mareano, Vannmiljø, ICES-DOME, MUDAB; 4Demon has none) into
+one best estimate per element, rather than reporting each apart.
+
+Two things the pooled, merged data adds over the per-source view:
+
+- **Outliers are dropped.** The distributional `outlier_flag` (mostly registration
+  errors, see [Outlier Flagging](./outlier-flagging.qmd)) is excluded from the
+  concentration-versus-fines fits, so a few impossible values do not swing the
+  slopes.
+- **One relationship per element.** Deduplication means a reading shared by two
+  sources is counted once, so the pooled fit is not double-weighted.
+
+All depths are kept but reported by the EFSA depth bands (0 to 5, 5 to 40, over
+40 cm), assigned from the subsample interval midpoint.
+
+```{r}
+#| label: setup
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+
+gdir <- "data/merged_summary"
+rd <- function(f) read.csv(file.path(gdir, f), stringsAsFactors = FALSE,
+                           check.names = FALSE)
+frac  <- rd("merged_grainsize_fraction_summary.csv")
+fines <- rd("merged_grainsize_fines_summary.csv")
+concf <- rd("merged_grainsize_conc_vs_fines.csv")
+bvs   <- rd("merged_grainsize_bulk_vs_sieved.csv")
+pts   <- rd("merged_grainsize_targets_fines.csv")
+
+elem_levels <- c("CO", "CU", "I", "MN", "MO", "SE", "ZN")
+band_levels <- c("0-5", "5-40", ">40", "unknown")
+src_levels  <- c("All (pooled)", "Mareano", "Vannmiljø", "ICES-DOME", "MUDAB")
+frac_lab    <- c(bulk = "Bulk", sieved63 = "Sieved <63 µm",
+                 sieved20 = "Sieved <20 µm", sieved_other = "Sieved (other)")
+theme_set(theme_minimal(base_size = 12))
+```
+
+## 1. Sample fraction: bulk vs sieved
+
+How the target measurements divide between bulk (whole sample) and the two sieved
+tracks (<63 µm and <20 µm). The bulk track dominates, but both sieved tracks carry
+thousands of readings, mostly Copper, Zinc and Manganese.
+
+```{r}
+#| label: fraction-table
+bvs |>
+  mutate(fraction = frac_lab[fraction],
+         Element = factor(symbol, levels = elem_levels)) |>
+  select(Element, fraction, n) |>
+  pivot_wider(names_from = fraction, values_from = n, values_fill = 0) |>
+  arrange(Element) |>
+  kable(format.args = list(big.mark = ","))
+```
+
+## 2. The <63 µm fines
+
+The percentage of material finer than 63 µm (the clay + silt mud), by depth band,
+pooled across the grain-size sources. `mud_dominated` counts subsamples that are at
+least 50 % fines. Deeper layers are muddier: the fines median climbs from about
+37 % near the surface to 64 % below 40 cm.
+
+```{r}
+#| label: fines-table
+fines |>
+  mutate(band = factor(band, levels = band_levels)) |>
+  arrange(band) |>
+  select(band, n_subsamples, n_with_fines, mean, median, p25, p75, mud_dominated) |>
+  kable(col.names = c("Depth band (cm)", "Subsamples", "With fines",
+                      "Mean %", "Median %", "P25", "P75", "Mud-dominated"),
+        format.args = list(big.mark = ","))
+```
+
+## 3. Bulk versus sieved concentration
+
+Sieving to the fine fraction lifts the concentration well above bulk for the
+grain-size-controlled metals. Pooled medians: the <20 µm fraction runs roughly two
+to four times the bulk level. Molybdenum is the exception (redox / organic
+controlled, not grain-size controlled), so its sieved values sit at or below bulk.
+
+```{r}
+#| label: bvs-table
+bvs |>
+  filter(fraction %in% c("bulk", "sieved63", "sieved20")) |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  select(Element, fraction, median) |>
+  pivot_wider(names_from = fraction, values_from = median) |>
+  transmute(Element,
+            `Bulk` = bulk,
+            `<63 µm` = sieved63,
+            `<20 µm` = sieved20,
+            `<63 / bulk` = round(sieved63 / bulk, 1),
+            `<20 / bulk` = round(sieved20 / bulk, 1)) |>
+  arrange(Element) |>
+  kable(format.args = list(big.mark = ","))
+```
+
+```{r}
+#| label: bvs-fig
+#| fig-cap: "Median target concentration by fraction (mg/kg, log scale), pooled and outlier-free."
+#| fig-width: 7.5
+#| fig-height: 3.6
+bvs |>
+  filter(fraction %in% c("bulk", "sieved63", "sieved20"),
+         symbol %in% c("CO", "CU", "MN", "MO", "ZN")) |>
+  mutate(Element = factor(symbol, levels = elem_levels),
+         fraction = factor(frac_lab[fraction],
+                           levels = c("Bulk", "Sieved <63 µm", "Sieved <20 µm"))) |>
+  ggplot(aes(Element, median, fill = fraction)) +
+  geom_col(position = position_dodge()) +
+  scale_y_log10() +
+  scale_fill_manual(values = c("Bulk" = "#4477AA", "Sieved <63 µm" = "#CCBB44",
+                               "Sieved <20 µm" = "#228833")) +
+  labs(x = NULL, y = "median concentration (mg/kg, log)", fill = NULL)
+```
+
+## 4. The grain-size effect (bulk samples)
+
+Within **bulk** samples, where the reported value describes the whole sample,
+concentration rises with the fines content, as expected. The pooled Spearman
+correlation of concentration with `fines_lt63` is clearly positive for the
+lithogenic metals (Cobalt, Manganese, Copper, Zinc) and near zero for Molybdenum
+and Selenium, which track organic matter and redox rather than grain size. Iodine
+carries no bulk grain-size data and drops out.
+
+```{r}
+#| label: concf-pooled
+concf |>
+  filter(Source == "All (pooled)", band %in% c("0-5", "5-40", ">40")) |>
+  mutate(Element = factor(symbol, levels = elem_levels),
+         band = factor(band, levels = band_levels)) |>
+  select(Element, band, n, rho) |>
+  pivot_wider(names_from = band, values_from = c(n, rho), values_fill = NA) |>
+  transmute(Element,
+            `n (0-5)` = `n_0-5`,   `rho (0-5)` = `rho_0-5`,
+            `n (5-40)` = `n_5-40`, `rho (5-40)` = `rho_5-40`,
+            `n (>40)` = `n_>40`,   `rho (>40)` = `rho_>40`) |>
+  arrange(Element) |>
+  kable(format.args = list(big.mark = ","))
+```
+
+Broken out by source (all depths together), the association is tightest in the
+Mareano data, whose bulk samples and clean grain-size give the clearest signal.
+
+```{r}
+#| label: concf-source
+concf |>
+  filter(Source != "All (pooled)") |>
+  mutate(Source = factor(Source, levels = src_levels),
+         Element = factor(symbol, levels = elem_levels)) |>
+  select(Source, Element, n, rho) |>
+  pivot_wider(names_from = Element, values_from = rho, id_cols = Source,
+              names_expand = TRUE) |>
+  select(where(~ !all(is.na(.)))) |>
+  arrange(Source) |>
+  kable(caption = "Spearman rho, concentration vs % fines (bulk, all depths).")
+```
+
+```{r}
+#| label: concf-fig
+#| fig-cap: "Bulk target concentration against the <63 µm fines content, pooled across sources (log y, linear fit). Outliers excluded."
+#| fig-width: 8
+#| fig-height: 5.5
+pts |>
+  filter(is.na(outlier_flag) | outlier_flag == "",
+         symbol %in% c("CO", "CU", "MN", "ZN"),
+         !is.na(fines_lt63), value_std > 0) |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  ggplot(aes(fines_lt63, value_std)) +
+  geom_point(alpha = 0.08, size = 0.5, colour = "#4477AA") +
+  geom_smooth(method = "lm", formula = y ~ x, colour = "#AA3377", se = FALSE) +
+  scale_y_log10() +
+  facet_wrap(~ Element, scales = "free_y") +
+  labs(x = "fines <63 µm (%)", y = "concentration (mg/kg, log)")
+```
+
+::: {.callout-note}
+The grain-size effect is measured on bulk samples only: a sieved <63 µm value is of
+the fine fraction, not the whole sample, so relating it to the whole-sample fines
+would not be meaningful. Molybdenum, Selenium and Iodine are kept in the tables but
+are noisier (lower counts, and not purely grain-size controlled), so grain-size
+correction is the wrong control for them.
+:::
