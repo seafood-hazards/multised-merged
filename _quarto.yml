@@ -30,6 +30,8 @@ website:
             href: outlier-flagging.qmd
           - text: "Grain Size"
             href: grain-size.qmd
+          - text: "Fe/Al Normalisation"
+            href: normalisation.qmd
       - text: "Explore"
         menu:
           - text: "Merged Tables"

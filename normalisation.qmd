@@ -1,0 +1,159 @@
+---
+title: "Fe/Al Normalisation"
+subtitle: "Normalising the target metals to iron and aluminium, pooled across the merged database"
+---
+
+```{css, echo=FALSE}
+th { white-space: nowrap; }
+```
+
+Finer, more aluminosilicate-rich sediment carries more of both the lithogenic
+normalisers (iron, aluminium) and the trace metals, so dividing a metal by Fe (or
+Al) corrects that grain-size and mineralogical variation. A strong metal to
+normaliser relationship means the metal is naturally (lithogenically) controlled,
+the baseline an enrichment-factor or pristine determination rests on.
+
+This is the merged-database counterpart of the per-source normalisation analysis on
+the clean databases: run once on the single merged database, where cross-source
+duplicates are already removed, so the four sources that carry normalisers are
+**pooled** into one estimate per element (a per-source breakdown is kept alongside).
+Each target is paired with the Fe and Al measured on the **same subsample and same
+(bulk) fraction**, since normalisation is only valid within a comparable fraction.
+Distributional outliers (see [Outlier Flagging](./outlier-flagging.qmd)) are dropped
+from both the target and the normaliser. All depths are kept, reported by the EFSA
+depth bands.
+
+```{r}
+#| label: setup
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+
+ndir <- "data/merged_summary"
+rd <- function(f) read.csv(file.path(ndir, f), stringsAsFactors = FALSE,
+                           check.names = FALSE)
+avail <- rd("merged_normalisation_availability.csv")
+corr  <- rd("merged_normalisation_correlation.csv")
+ratio <- rd("merged_normalisation_ratios.csv")
+pairs <- rd("merged_normalisation_pairs.csv")
+
+elem_levels <- c("CO", "CU", "I", "MN", "MO", "SE", "ZN")
+band_levels <- c("0-5", "5-40", ">40", "unknown")
+src_levels  <- c("All (pooled)", "Mareano", "Vannmiljø", "ICES-DOME", "MUDAB")
+theme_set(theme_minimal(base_size = 12))
+```
+
+## 1. Can the data be normalised?
+
+How much of the bulk target data carries a co-located Fe or Al value (same
+subsample), by element and depth band. Coverage is uneven: the full-suite metals
+(Cobalt, Manganese, Selenium) are almost always normalisable, while Copper and Zinc,
+whose bulk counts are by far the largest, carry a normaliser only about a quarter of
+the time. So their normalised and un-normalised subsets should be reported apart.
+
+```{r}
+#| label: avail-table
+avail |>
+  mutate(Element = factor(symbol, levels = elem_levels),
+         band = factor(band, levels = band_levels)) |>
+  filter(band != "unknown") |>
+  arrange(Element, band) |>
+  select(Element, band, n_target, `% with Fe` = pct_FE, `% with Al` = pct_AL) |>
+  kable(col.names = c("Element", "Depth band (cm)", "Bulk targets",
+                      "% with Fe", "% with Al"),
+        format.args = list(big.mark = ","))
+```
+
+## 2. How well does each normaliser work?
+
+The r-squared of a log-log fit of metal against normaliser (bulk, at least 30
+pairs). High values mean the metal is grain-size / mineralogically controlled, so
+the normaliser is a sound baseline. Two things stand out in the pooled data:
+
+- **Iron is the stronger normaliser.** For Cobalt, Copper and Zinc the Fe fit is far
+  tighter than the Al fit (Co 0.70 vs 0.24, Zn 0.55 vs 0.33, Cu 0.49 vs 0.21). Al
+  carries less of the grain-size signal here, so Fe is the better default carrier.
+- **Molybdenum and Selenium do not normalise** on either (r-squared near zero): they
+  are redox and organic controlled, not lithogenic, so Fe/Al normalisation does not
+  apply to them.
+
+```{r}
+#| label: strength-table
+corr |>
+  filter(Source == "All (pooled)") |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  select(Element, normaliser, r2) |>
+  pivot_wider(names_from = normaliser, values_from = r2) |>
+  transmute(Element, `r2 (Fe)` = FE, `r2 (Al)` = AL) |>
+  arrange(Element) |>
+  kable()
+```
+
+```{r}
+#| label: strength-fig
+#| fig-cap: "Log-log metal to normaliser fit strength (r-squared), pooled and per source (bulk)."
+#| fig-width: 8.5
+#| fig-height: 4.5
+corr |>
+  filter(Source %in% c("All (pooled)", "Mareano", "ICES-DOME")) |>
+  mutate(Element = factor(symbol, levels = elem_levels),
+         Source = factor(Source, levels = src_levels)) |>
+  ggplot(aes(Element, r2, fill = normaliser)) +
+  geom_col(position = position_dodge()) +
+  scale_fill_manual(values = c(AL = "#4477AA", FE = "#EE6677")) +
+  facet_wrap(~ Source) +
+  labs(x = NULL, y = "r-squared (log-log)", fill = "normaliser") +
+  ylim(0, 1)
+```
+
+## 3. The lithogenic relationship
+
+For the well-behaved metals, concentration scales with iron along a tight log-log
+line, the natural (lithogenic) baseline. Pooled across sources and outlier-free;
+points well above the line would be enrichment candidates.
+
+```{r}
+#| label: scatter-fig
+#| fig-cap: "Bulk target concentration against iron, pooled across sources (log-log, linear fit)."
+#| fig-width: 8
+#| fig-height: 3.2
+pairs |>
+  filter(symbol %in% c("CO", "CU", "ZN"),
+         !is.na(FE), FE > 0, value_std > 0) |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  ggplot(aes(FE, value_std)) +
+  geom_point(alpha = 0.1, size = 0.5, colour = "#EE6677") +
+  geom_smooth(method = "lm", formula = y ~ x, colour = "#333333", se = FALSE) +
+  scale_x_log10() +
+  scale_y_log10() +
+  facet_wrap(~ Element, scales = "free_y") +
+  labs(x = "Fe (mg/kg, log)", y = "concentration (mg/kg, log)")
+```
+
+## 4. Normalised values (metal / normaliser)
+
+The median metal-to-normaliser ratio (bulk, pooled), the normalised concentration on
+which a local background and enrichment factor would later be built.
+
+```{r}
+#| label: ratio-table
+ratio |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  select(Element, normaliser, n, median, p25, p75) |>
+  pivot_wider(names_from = normaliser, values_from = c(n, median, p25, p75)) |>
+  transmute(Element,
+            `n (Fe)` = n_FE, `median Me/Fe` = median_FE,
+            `n (Al)` = n_AL, `median Me/Al` = median_AL) |>
+  arrange(Element) |>
+  kable(format.args = list(big.mark = ",", scientific = TRUE))
+```
+
+::: {.callout-note}
+Normalisation applies to the grain-size-controlled metals (Cobalt, Copper, Zinc, and
+more weakly Manganese), and iron is the better normaliser for them here. Molybdenum
+and Selenium are not lithogenically controlled, so their Fe/Al fits are near zero and
+normalisation is not appropriate for them; they are kept in the tables for
+completeness. The enrichment factor and pristine cutoff are built on these normalised
+values at a later background stage.
+:::
