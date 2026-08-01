@@ -4,7 +4,7 @@ db = {
   const StratumSQLite = await window._stratumSQLite;
   return StratumSQLite.open(window._dbMerged, {
     sqlJsPath: window._sqljsBase,
-    cacheKey:  "multised-merged@v0.2.1",
+    cacheKey:  "multised-merged@v0.5.0",
   });
 }
 ```
