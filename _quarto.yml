@@ -34,6 +34,8 @@ website:
             href: normalisation.qmd
           - text: "Organic Carbon"
             href: organic-carbon.qmd
+          - text: "Depth Profiles"
+            href: depth-profile.qmd
       - text: "Explore"
         menu:
           - text: "Merged Tables"
