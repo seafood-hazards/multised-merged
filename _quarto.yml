@@ -42,6 +42,8 @@ website:
             href: spatial.qmd
           - text: "Sampling Year"
             href: temporal.qmd
+          - text: "Repeat-Sampled Sites"
+            href: site-years.qmd
       - text: "Explore"
         menu:
           - text: "Merged Tables"
