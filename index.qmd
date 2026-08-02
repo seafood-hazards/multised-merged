@@ -52,9 +52,10 @@ merge, then a single database from there:
 4. **merged** *(this site)*: the five clean databases are combined into a single
    `multised_merged.sqlite`, with cross-source duplicates removed.
 5. **refined** *(creation documented on this site)*: a restructured, slimmed copy of
-   the merged database with the reusable analysis results baked in, built as an
-   analysis-ready base for the later pristine / background-sediment work. See the
-   [Refined DB](./refined-schema.qmd) pages.
+   the merged database with the reusable analysis results baked in, an analysis-ready
+   base for the pristine / background-sediment work. Its build is documented here (the
+   [Refined DB](./refined-schema.qmd) pages) and the analyses on the
+   [refined site](https://seafood-hazards.github.io/multised-refined/).
 
 ## What this site covers
 
