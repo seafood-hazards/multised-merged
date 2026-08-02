@@ -39,10 +39,10 @@ tbl |>
   kable(align = "lllr")
 ```
 
-The seven target elements move into the two fraction tables; the Fe / Al / organic-carbon
-rows become the `normaliser`; `grain_size_fraction` is dropped in favour of the derived
-fines already on `subsample`; and the dimensions are carried, with `element` and `method`
-trimmed to the targets.
+The seven target elements stay in a single `measurement` table (bulk and sieved told
+apart by `frac_class`); the Fe / Al / organic-carbon rows become the `normaliser`;
+`grain_size_fraction` is dropped in favour of the derived fines already on `subsample`;
+and the dimensions are carried, with `element` and `method` trimmed to the targets.
 
 ## Every merged measurement row accounted for
 

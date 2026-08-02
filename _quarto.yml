@@ -22,12 +22,6 @@ website:
             href: db-schema-merged.qmd
           - text: "DB Schema (Aquaculture)"
             href: db-schema-aquaculture.qmd
-      - text: "Refined DB"
-        menu:
-          - text: "DB Schema (Refined)"
-            href: refined-schema.qmd
-          - text: "Building the Refined DB"
-            href: refined-build.qmd
       - text: "Analyses"
         menu:
           - text: "Data Categories"
@@ -72,6 +66,12 @@ website:
             href: grain-size-map.qmd
           - text: "Aquaculture Map"
             href: aquaculture-map.qmd
+      - text: "Refined DB"
+        menu:
+          - text: "DB Schema (Refined)"
+            href: refined-schema.qmd
+          - text: "Building the Refined DB"
+            href: refined-build.qmd
 
 format:
   html:

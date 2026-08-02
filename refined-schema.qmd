@@ -31,9 +31,10 @@ made here.
 
 ## What changed from the merged database
 
-- **`measurement` splits into `bulk_measurement` and `sieved_measurement`.** The two
-  fractions are never pooled, so the split makes that structural; the sieve columns live
-  only on the sieved table. Both hold **only the 7 target elements**.
+- **`measurement` keeps only the 7 target elements**, told apart by a `frac_class`
+  column (bulk / sieved), which are never pooled. Three redundant columns are dropped:
+  `unit_std` (always mg/kg), `matrix` (a raw grain-size code, unused now grain size is
+  gone) and `sieve_um` (superseded by the harmonised `sieve_um_std`).
 - **Fe, Al and organic carbon leave `measurement`.** They were only ever normalisers, so
   they become a compact **`normaliser`** table (one wide row per subsample and fraction),
   and each target row gains the baked **`ratio_fe` / `ratio_al` / `ratio_corg`**.
@@ -51,14 +52,11 @@ erDiagram
   site        ||--o{ event              : "site_id"
   aquaculture ||--o{ site               : "aqua_id"
   event       ||--o{ subsample          : "event_id"
-  subsample   ||--o{ bulk_measurement   : "subsample_id"
-  subsample   ||--o{ sieved_measurement : "subsample_id"
+  subsample   ||--o{ measurement        : "subsample_id"
   subsample   ||--o{ normaliser         : "subsample_id"
-  element     ||--o{ bulk_measurement   : "symbol"
-  element     ||--o{ sieved_measurement : "symbol"
+  element     ||--o{ measurement        : "symbol"
   element     ||--o{ method             : "symbol"
-  method      ||--o{ bulk_measurement   : "method_id"
-  method      ||--o{ sieved_measurement : "method_id"
+  method      ||--o{ measurement        : "method_id"
 
   aquaculture {
     INTEGER aqua_id PK
@@ -85,17 +83,12 @@ erDiagram
     REAL al
     REAL corg
   }
-  bulk_measurement {
+  measurement {
     INTEGER measurement_id PK
     INTEGER subsample_id FK
     TEXT symbol FK
+    TEXT frac_class
     REAL ratio_fe
-  }
-  sieved_measurement {
-    INTEGER measurement_id PK
-    INTEGER subsample_id FK
-    TEXT symbol FK
-    REAL sieve_um_std
   }
   element {
     TEXT symbol PK
@@ -111,10 +104,10 @@ library(tibble)
 library(knitr)
 ```
 
-## bulk_measurement / sieved_measurement
+## measurement
 
-One row per target-element reading, split by fraction. Both carry the baked
-normalisation ratios; `sieved_measurement` adds the sieve cutoff columns.
+One row per target-element reading, bulk and sieved told apart by `frac_class` (never
+pooled). Carries the baked normalisation ratios; the sieve columns are NULL for bulk.
 
 ```{r}
 tribble(
@@ -122,25 +115,27 @@ tribble(
   "measurement_id",    "INTEGER", "Primary key (from the merged database).",
   "subsample_id",      "INTEGER", "-> subsample.",
   "symbol",            "TEXT",    "Target element (-> element); one of CO CU I MN MO SE ZN.",
+  "frac_class",        "TEXT",    "Sediment fraction: 'bulk' or 'sieved'.",
   "value",             "REAL",    "Value in the original unit.",
   "unit",              "TEXT",    "Original reporting unit.",
   "value_std",         "REAL",    "Standardised value, mg/kg.",
-  "unit_std",          "TEXT",    "Always mg/kg.",
   "value_sd",          "REAL",    "SD across replicates, else NULL.",
   "n_rep",             "INTEGER", "Replicates averaged (1 = single).",
   "value_uncrt",       "REAL",    "Analytical uncertainty, mg/kg, else NULL.",
-  "matrix",            "TEXT",    "Raw ICES fraction code (provenance).",
   "method_id",         "INTEGER", "-> method.",
   "ratio_fe",          "REAL",    "value_std / Fe (same subsample, fraction), else NULL.",
   "ratio_al",          "REAL",    "value_std / Al, else NULL.",
   "ratio_corg",        "REAL",    "value_std / organic carbon, else NULL.",
+  "sieve_um_std",      "REAL",    "Harmonised sieve cutoff (um); NULL for bulk.",
+  "sieve_class",       "TEXT",    "Sieve label, e.g. '<63um'; NULL for bulk.",
   "source",            "TEXT",    "Source database name.",
   "src_measurement_id","TEXT",    "Original key (provenance).",
-  "outlier_flag",      "TEXT",    "Distributional outlier marker: 'high' / 'low', else NULL.",
-  "sieve_um_std",      "REAL",    "sieved_measurement only: harmonised sieve cutoff (um).",
-  "sieve_class",       "TEXT",    "sieved_measurement only: sieve label, e.g. '<63um'."
+  "outlier_flag",      "TEXT",    "Distributional outlier marker: 'high' / 'low', else NULL."
 ) |> kable()
 ```
+
+The standardised unit column is gone (`value_std` is always mg/kg), as are the raw
+ICES `matrix` code and the pre-harmonised `sieve_um`.
 
 ## normaliser
 
