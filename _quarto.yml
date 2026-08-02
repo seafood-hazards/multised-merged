@@ -44,6 +44,10 @@ website:
             href: temporal.qmd
           - text: "Repeat-Sampled Sites"
             href: site-years.qmd
+      - text: "Clustering"
+        menu:
+          - text: "Geochemical Facies"
+            href: geochemical-facies.qmd
       - text: "Explore"
         menu:
           - text: "Merged Tables"
