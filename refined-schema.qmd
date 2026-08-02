@@ -1,0 +1,213 @@
+---
+title: "DB Schema (Refined)"
+subtitle: "The analysis-ready mart derived from the merged database"
+---
+
+```{css, echo=FALSE}
+th { white-space: nowrap; }
+.mermaid { max-width: 680px; margin-left: auto; margin-right: auto; }
+.mermaid svg { max-width: 100% !important; width: 100%; height: auto; }
+```
+
+The **refined** database (`multised_refined.sqlite`) is a restructured, slimmed copy of
+the [merged database](./db-schema-merged.qmd), built for the later work on identifying
+pristine / background sediments. It bakes in the reusable results of the merged-database
+analyses so those are not recomputed, and drops the data that work did not use.
+
+## The rule behind the refactor
+
+One rule decides what the refined database holds:
+
+> **Bake in facts and already-computed reusable values; defer every classification or
+> threshold.**
+
+So it carries the **normalisation ratios** (metal / Fe, metal / Al, metal / organic
+carbon), the grain-size fines, the aquaculture link and the repeat-sampling grouping,
+all as ready-to-use columns. It carries **none** of the decisions the pristine work will
+own: no depth bands, no offshore or pressure flags, no enrichment-factor thresholds, no
+pristine label, and no cluster labels (those re-run cheaply from the ratios). The raw
+material for all of those (ratios, distances, raw depth) is present; the calls are not
+made here.
+
+## What changed from the merged database
+
+- **`measurement` splits into `bulk_measurement` and `sieved_measurement`.** The two
+  fractions are never pooled, so the split makes that structural; the sieve columns live
+  only on the sieved table. Both hold **only the 7 target elements**.
+- **Fe, Al and organic carbon leave `measurement`.** They were only ever normalisers, so
+  they become a compact **`normaliser`** table (one wide row per subsample and fraction),
+  and each target row gains the baked **`ratio_fe` / `ratio_al` / `ratio_corg`**.
+- **`grain_size_fraction` is dropped.** Every analysis used the derived `fines_lt63` (kept
+  on `subsample`), never the raw curve.
+- **`site` gains `aqua_id`** (a link to the new **`aquaculture`** table) and
+  **`repeat_group` / `n_years`** (the repeat-sampled-location grouping).
+- **`element` is trimmed to the 7 targets**, and `method` to the methods those targets use.
+
+## Schema diagram
+
+```{mermaid}
+erDiagram
+  dataset     ||--o{ event              : "dataset_id"
+  site        ||--o{ event              : "site_id"
+  aquaculture ||--o{ site               : "aqua_id"
+  event       ||--o{ subsample          : "event_id"
+  subsample   ||--o{ bulk_measurement   : "subsample_id"
+  subsample   ||--o{ sieved_measurement : "subsample_id"
+  subsample   ||--o{ normaliser         : "subsample_id"
+  element     ||--o{ bulk_measurement   : "symbol"
+  element     ||--o{ sieved_measurement : "symbol"
+  element     ||--o{ method             : "symbol"
+  method      ||--o{ bulk_measurement   : "method_id"
+  method      ||--o{ sieved_measurement : "method_id"
+
+  aquaculture {
+    INTEGER aqua_id PK
+  }
+  site {
+    INTEGER site_id PK
+    INTEGER aqua_id FK
+    TEXT repeat_group
+  }
+  event {
+    INTEGER event_id PK
+    INTEGER dataset_id FK
+    INTEGER site_id FK
+  }
+  subsample {
+    INTEGER subsample_id PK
+    INTEGER event_id FK
+    REAL fines_lt63
+  }
+  normaliser {
+    INTEGER subsample_id FK
+    TEXT frac_class
+    REAL fe
+    REAL al
+    REAL corg
+  }
+  bulk_measurement {
+    INTEGER measurement_id PK
+    INTEGER subsample_id FK
+    TEXT symbol FK
+    REAL ratio_fe
+  }
+  sieved_measurement {
+    INTEGER measurement_id PK
+    INTEGER subsample_id FK
+    TEXT symbol FK
+    REAL sieve_um_std
+  }
+  element {
+    TEXT symbol PK
+  }
+  method {
+    INTEGER method_id PK
+    TEXT symbol FK
+  }
+```
+
+```{r}
+library(tibble)
+library(knitr)
+```
+
+## bulk_measurement / sieved_measurement
+
+One row per target-element reading, split by fraction. Both carry the baked
+normalisation ratios; `sieved_measurement` adds the sieve cutoff columns.
+
+```{r}
+tribble(
+  ~Column,             ~Type,     ~Meaning,
+  "measurement_id",    "INTEGER", "Primary key (from the merged database).",
+  "subsample_id",      "INTEGER", "-> subsample.",
+  "symbol",            "TEXT",    "Target element (-> element); one of CO CU I MN MO SE ZN.",
+  "value",             "REAL",    "Value in the original unit.",
+  "unit",              "TEXT",    "Original reporting unit.",
+  "value_std",         "REAL",    "Standardised value, mg/kg.",
+  "unit_std",          "TEXT",    "Always mg/kg.",
+  "value_sd",          "REAL",    "SD across replicates, else NULL.",
+  "n_rep",             "INTEGER", "Replicates averaged (1 = single).",
+  "value_uncrt",       "REAL",    "Analytical uncertainty, mg/kg, else NULL.",
+  "matrix",            "TEXT",    "Raw ICES fraction code (provenance).",
+  "method_id",         "INTEGER", "-> method.",
+  "ratio_fe",          "REAL",    "value_std / Fe (same subsample, fraction), else NULL.",
+  "ratio_al",          "REAL",    "value_std / Al, else NULL.",
+  "ratio_corg",        "REAL",    "value_std / organic carbon, else NULL.",
+  "source",            "TEXT",    "Source database name.",
+  "src_measurement_id","TEXT",    "Original key (provenance).",
+  "outlier_flag",      "TEXT",    "Distributional outlier marker: 'high' / 'low', else NULL.",
+  "sieve_um_std",      "REAL",    "sieved_measurement only: harmonised sieve cutoff (um).",
+  "sieve_class",       "TEXT",    "sieved_measurement only: sieve label, e.g. '<63um'."
+) |> kable()
+```
+
+## normaliser
+
+The Fe / Al / organic-carbon values, reshaped from the merged `measurement` rows to one
+wide row per **subsample and fraction** (the grain a ratio needs, since a subsample can
+carry both fractions). Multi-method values are mean-collapsed.
+
+```{r}
+tribble(
+  ~Column,        ~Type,     ~Meaning,
+  "subsample_id", "INTEGER", "-> subsample.",
+  "frac_class",   "TEXT",    "'bulk' or 'sieved'.",
+  "fe",           "REAL",    "Iron, mg/kg, else NULL.",
+  "al",           "REAL",    "Aluminium, mg/kg, else NULL.",
+  "corg",         "REAL",    "Organic carbon, mg/kg, else NULL."
+) |> kable()
+```
+
+## site (additions)
+
+The merged `site` columns, plus:
+
+```{r}
+tribble(
+  ~Column,        ~Type,     ~Meaning,
+  "aqua_id",      "INTEGER", "-> aquaculture: the nearest aquaculture site (Norway only, else NULL).",
+  "repeat_group", "TEXT",    "Location cell (lat/lon to 2 dp, ~1.1 km) for repeat-sampling grouping.",
+  "n_years",      "INTEGER", "Distinct sampling years at that cell (over all dated events)."
+) |> kable()
+```
+
+## aquaculture
+
+The Norwegian aquaculture reference, imported so `site.aqua_id` can point to it.
+
+```{r}
+tribble(
+  ~Column,           ~Type,     ~Meaning,
+  "aqua_id",         "INTEGER", "Primary key.",
+  "loknr",           "TEXT",    "Site (locality) number.",
+  "name",            "TEXT",    "Site name.",
+  "latitude",        "REAL",    "Latitude, decimal degrees.",
+  "longitude",       "REAL",    "Longitude, decimal degrees.",
+  "start_year",      "INTEGER", "First year of operation, where known.",
+  "end_year",        "INTEGER", "Last year of operation, where known.",
+  "active",          "INTEGER", "1 = currently active, 0 = closed.",
+  "capacity_tonnes", "REAL",    "Licensed capacity, tonnes.",
+  "fish_types",      "TEXT",    "Species farmed.",
+  "placement",       "TEXT",    "Placement descriptor (e.g. sea, land).",
+  "county",          "TEXT",    "County.",
+  "municipality",    "TEXT",    "Municipality."
+) |> kable()
+```
+
+## Carried over
+
+`subsample` keeps its physical columns (`depth_from` / `depth_to`, the exist flags,
+`fines_lt63` / `fines_basis`); `dataset` and `event` are unchanged; `method` keeps the
+detection limits (`lod` / `loq`). Their columns are as on the
+[merged schema](./db-schema-merged.qmd). Depths are kept **raw** (no bands), and no Fe /
+Al / organic values are duplicated onto the target rows: they live once in `normaliser`,
+reachable by the subsample and fraction.
+
+::: {.callout-note}
+The refined database is deliberately incomplete by design: it stops at the reusable
+building blocks. The pristine / background analyses that consume it (enrichment factors,
+depth bands, pressure and pristine classification) live on a separate site, so the choices
+they make are never frozen into the data here. How the refined database is assembled step
+by step is on [Building the Refined DB](./refined-build.qmd).
+:::

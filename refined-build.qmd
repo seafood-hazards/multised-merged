@@ -1,0 +1,102 @@
+---
+title: "Building the Refined DB"
+subtitle: "How the merged database is restructured into the refined mart, and what is kept"
+---
+
+```{css, echo=FALSE}
+th { white-space: nowrap; }
+```
+
+The [refined database](./refined-schema.qmd) is built from the merged database in a short
+sequence of steps: restructure the tables, reshape the normalisers, bake the ratios, link
+the aquaculture reference, group the repeat-sampled locations, and reconcile. This page
+reports what each step keeps and drops, so every merged row is accounted for.
+
+```{r}
+#| label: setup
+library(dplyr)
+library(ggplot2)
+library(knitr)
+
+fdir <- "data/merged_summary"
+rd <- function(f) read.csv(file.path(fdir, f), stringsAsFactors = FALSE,
+                           check.names = FALSE)
+tbl   <- rd("refined_tables.csv")
+recon <- rd("refined_reconciliation.csv")
+cov   <- rd("refined_coverage.csv")
+theme_set(theme_minimal(base_size = 12))
+```
+
+## What happens to each table
+
+```{r}
+#| label: tables
+tbl |>
+  transmute(Table = table,
+            `merged rows` = ifelse(is.na(merged_rows), "", format(merged_rows, big.mark = ",")),
+            `refined rows` = ifelse(is.na(refined_rows), "", format(refined_rows, big.mark = ",")),
+            Disposition = disposition) |>
+  kable(align = "lllr")
+```
+
+The seven target elements move into the two fraction tables; the Fe / Al / organic-carbon
+rows become the `normaliser`; `grain_size_fraction` is dropped in favour of the derived
+fines already on `subsample`; and the dimensions are carried, with `element` and `method`
+trimmed to the targets.
+
+## Every merged measurement row accounted for
+
+The merged `measurement` table has one row per reading. Each goes to exactly one place, or
+is dropped for a stated reason:
+
+```{r}
+#| label: reconciliation
+recon |>
+  transmute(`Merged rows` = group, n = rows, Destination = destination) |>
+  kable(format.args = list(big.mark = ","))
+```
+
+```{r}
+#| label: recon-check
+total <- sum(recon$rows)
+```
+
+That is **`r format(total, big.mark = ",")`** rows in total, the full merged measurement
+table. The only rows dropped are `TOC63` (organic carbon reported on the sieved fraction,
+a different quantity from whole-sample organic carbon and not used as a normaliser).
+
+## Coverage of the baked values
+
+The ratios and normalisers are only as complete as the underlying data: a target row gets
+a ratio only where the matching normaliser was measured in the same subsample and fraction.
+The chart shows how much of each is populated.
+
+```{r}
+#| label: coverage-fig
+#| fig-cap: "Percentage populated for each baked field, by table. Organic carbon is the best-covered normaliser for bulk, aluminium for sieved; the aquaculture link covers the Norway sites."
+#| fig-width: 8
+#| fig-height: 4.2
+cov |>
+  mutate(lab = paste(scope, field),
+         lab = reorder(lab, pct)) |>
+  ggplot(aes(pct, lab)) +
+  geom_col(fill = "#4477AA") +
+  geom_text(aes(label = paste0(pct, "%")), hjust = -0.15, size = 3) +
+  scale_x_continuous(limits = c(0, 100), expand = expansion(mult = c(0, 0.12))) +
+  labs(x = "% populated", y = NULL)
+```
+
+```{r}
+#| label: coverage-table
+cov |>
+  transmute(Scope = scope, Field = field,
+            populated = n_present, of = n_total, `%` = pct) |>
+  kable(format.args = list(big.mark = ","))
+```
+
+::: {.callout-note}
+Coverage is a property of the source data, not of the build: a missing ratio means the
+normaliser was never measured for that sample, not that a step failed. The values that do
+exist are carried once, so the pristine analyses filter and aggregate them without
+recomputing. The schema itself is on [DB Schema (Refined)](./refined-schema.qmd).
+:::
