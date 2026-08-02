@@ -44,6 +44,7 @@ jobs:
             any::dplyr
             any::tidyr
             any::ggplot2
+            any::maps
 
       - name: Render site
         run: quarto render
