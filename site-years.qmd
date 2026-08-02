@@ -1,0 +1,179 @@
+---
+title: "Repeat-Sampled Sites"
+subtitle: "Trends over time at places sampled in more than one year, with location held roughly fixed"
+---
+
+```{css, echo=FALSE}
+th { white-space: nowrap; }
+```
+
+The [Sampling Year](./temporal.qmd) page pools every bulk measurement against its
+year, so "year" is tangled up with **where** each source sampled in each decade
+(one source owns the long Norwegian series, another only a single recent window).
+It can say there is no strong secular drift once outliers are removed, but not
+whether inputs changed **at a given place**, because the places themselves change
+from year to year.
+
+This page fixes that. It keeps only locations that were sampled in **more than one
+year** and measures the trend **inside** each location, so the differences between
+places are differenced out and what remains is closer to a real change over time at
+a fixed spot.
+
+A "location" here is a grid cell: latitude and longitude rounded to two decimals
+(about 1.1 km), coarser than the exact site key so nearby revisits of the same
+station group together. A cell is used for an element when it spans at least three
+distinct years and holds at least eight bulk measurements of that element.
+
+```{r}
+#| label: setup
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+
+sdir <- "data/merged_summary"
+rd <- function(f) read.csv(file.path(sdir, f), stringsAsFactors = FALSE,
+                           check.names = FALSE)
+trends <- rd("merged_siteyears_trends.csv")
+cells  <- rd("merged_siteyears_cells.csv")
+pooled <- rd("merged_siteyears_pooled.csv")
+meta   <- rd("merged_siteyears_meta.csv")
+
+elem_levels <- c("CO", "CU", "MN", "ZN")
+BLUE <- "#4477AA"; RED <- "#AA3377"
+theme_set(theme_minimal(base_size = 12))
+```
+
+At this resolution the merged database holds
+**`r format(meta$cells_multiyear, big.mark = ",")`** locations sampled in three or
+more years (out of `r format(meta$cells_total, big.mark = ",")` cells in all).
+Copper and zinc carry the analysis; cobalt and manganese have enough repeat
+sampling to report with caution; molybdenum, selenium and iodine are barely
+revisited and drop out.
+
+## A. Do raw levels trend at a fixed location?
+
+For each cell and element we take the Spearman correlation of the value with year,
+then look at the **distribution of those within-cell correlations** across cells.
+A median near zero means that, once you stand in one place, the metal is neither
+systematically rising nor falling.
+
+```{r}
+#| label: a-table
+trends |>
+  filter(measure == "value") |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  filter(!is.na(Element)) |>
+  transmute(Element, `cells` = n_cells, `median rho` = median_rho,
+            `% declining` = round(100 * frac_declining),
+            `% rising` = round(100 * frac_rising),
+            `median span (yr)` = median_span, `sign-test p` = p_sign) |>
+  arrange(Element) |>
+  kable(caption = "Within-cell trend of the raw value vs year, summarised across cells.")
+```
+
+Copper and zinc, the well-covered pair, sit almost exactly at zero (about half the
+cells rise, half fall): **the raw levels are flat over time at repeat-sampled
+places.** Manganese drifts gently down (a modest majority of cells declining);
+cobalt looks to rise but rests on only a handful of cells, so read it lightly.
+
+```{r}
+#| label: a-fig
+#| fig-cap: "Distribution of within-cell value-vs-year correlations, one point per location. The box is the interquartile range; the dashed line is no trend. A box centred on zero means levels are flat once location is fixed."
+#| fig-width: 7.5
+#| fig-height: 3.4
+cells |>
+  filter(measure == "value", symbol %in% elem_levels) |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  ggplot(aes(rho, Element)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey60") +
+  geom_boxplot(outlier.size = 0.6, fill = "grey92", width = 0.55) +
+  labs(x = "within-cell Spearman rho (value vs year)", y = NULL) +
+  xlim(-1, 1)
+```
+
+## B. Does a trend appear after normalisation?
+
+The same within-cell correlation, now on the **metal / iron ratio** (iron measured
+in the same subsample, the best grain-size carrier from the
+[Fe/Al Normalisation](./normalisation.qmd) page). Normalising strips out how much
+fine, metal-holding sediment happened to be in each grab, so a trend the raw value
+hides can surface.
+
+```{r}
+#| label: b-table
+trends |>
+  filter(measure == "enrich_FE") |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  filter(!is.na(Element)) |>
+  transmute(Element, `cells` = n_cells, `median rho` = median_rho,
+            `% declining` = round(100 * frac_declining),
+            `% rising` = round(100 * frac_rising),
+            `sign-test p` = p_sign) |>
+  arrange(Element) |>
+  kable(caption = "Within-cell trend of the metal / Fe enrichment ratio vs year.")
+```
+
+Zinc is the clear result: **flat as a raw value, but Zn/Fe falls within the same
+locations** (a median correlation near -0.33, roughly seven cells in ten declining,
+sign-test p well below 0.01). Standing in one place, the zinc load relative to its
+lithogenic carrier has come down over the years, the improvement signal the pooled
+[Sampling Year](./temporal.qmd) page could only hint at. Copper leans the same way
+more weakly; manganese and cobalt are indistinct on the fewer cells that carry iron.
+
+```{r}
+#| label: b-fig
+#| fig-cap: "Within-cell metal/Fe trend by element. Zinc sits clearly left of zero (declining enrichment at fixed locations); the others straddle it."
+#| fig-width: 7.5
+#| fig-height: 3.4
+cells |>
+  filter(measure == "enrich_FE", symbol %in% elem_levels) |>
+  mutate(Element = factor(symbol, levels = elem_levels)) |>
+  ggplot(aes(rho, Element)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey60") +
+  geom_boxplot(outlier.size = 0.6, fill = "grey92", width = 0.55) +
+  labs(x = "within-cell Spearman rho (metal / Fe vs year)", y = NULL) +
+  xlim(-1, 1)
+```
+
+## C. The shared drift, with location removed
+
+To combine the locations without letting the busiest cell dominate, we express each
+measurement as a log10 deviation from **its own cell's median**, then take the
+yearly median of that deviation across all cells. This removes the mean level of
+each place and leaves only the drift they share. A value of 0.1 on this scale is
+about a 25 percent departure from the local baseline.
+
+```{r}
+#| label: c-fig
+#| fig-cap: "Yearly median location-anomaly (log10 deviation from each location's own median), copper and zinc. The band near zero shows how little the raw level moves at fixed places; the loess line traces the gentle drift."
+#| fig-width: 8
+#| fig-height: 3.6
+pooled |>
+  filter(symbol %in% c("CU", "ZN")) |>
+  mutate(Element = factor(symbol, levels = c("CU", "ZN"))) |>
+  ggplot(aes(year, median_anom)) +
+  geom_hline(yintercept = 0, colour = "grey70") +
+  geom_point(aes(size = n_cells), alpha = 0.45, colour = BLUE) +
+  geom_smooth(method = "loess", formula = y ~ x, colour = RED, se = FALSE,
+              linewidth = 0.7) +
+  scale_size_area(max_size = 3, guide = "none") +
+  facet_wrap(~ Element) +
+  labs(x = "sampling year", y = "median log10 anomaly from local baseline")
+```
+
+Around nine years in ten sit within plus or minus 0.1 log10 (roughly 25 percent) of
+the local baseline, and the loess line is nearly flat: raw copper and zinc levels
+barely move at repeat-sampled places. The few larger excursions are sparse early
+years built on only a couple of locations (small points). The real temporal story is
+not in the raw concentration but in the **Fe-normalised zinc** of section B.
+
+::: {.callout-note}
+Holding location fixed is a big improvement on the pooled page, but not a controlled
+experiment: a cell can still contain a few sub-stations, and differencing location
+does not difference out changes in gear or laboratory within a cell over time. These
+remain associations. The one robust, direction-clear result is the decline in
+zinc relative to iron at repeat-sampled locations; everything else is flat or too
+thinly revisited to call. Molybdenum, selenium and iodine have too few repeat-sampled
+locations to appear.
+:::
