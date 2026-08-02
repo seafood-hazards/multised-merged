@@ -50,6 +50,8 @@ website:
             href: geochemical-facies.qmd
           - text: "Spatial Hotspots"
             href: spatial-hotspots.qmd
+          - text: "Geochemical Regions"
+            href: geochemical-regions.qmd
       - text: "Explore"
         menu:
           - text: "Merged Tables"

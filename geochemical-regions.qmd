@@ -1,0 +1,167 @@
+---
+title: "Geochemical Regions"
+subtitle: "Clustering on location and composition together, to map contiguous chemical regions"
+---
+
+```{css, echo=FALSE}
+th { white-space: nowrap; }
+```
+
+The first two Clustering pages take opposite halves of the problem:
+[Geochemical Facies](./geochemical-facies.qmd) groups by **chemistry alone** (a facies
+can be scattered across the map), and [Spatial Hotspots](./spatial-hotspots.qmd) groups
+by **location** around a single elevated element. This page uses **both at once**:
+cluster the samples on their position **and** their full composition together, so a
+cluster is a spatially-contiguous region that shares a geochemical signature, a
+regionalisation of the sea floor by chemistry.
+
+The awkward question is how much **geography** should count against **chemistry**. We
+make it explicit rather than hidden. Every feature is standardised; then each block
+(2 location dimensions, 4 chemistry dimensions) is scaled to equal total weight, and a
+single **location weight** multiplies the location block: zero is pure chemistry (the
+facies page), a large value is pure geography (a plain map partition), and one balances
+them. To compare cleanly with the facies page, the number of clusters is held at the
+facies value (four for bulk, two for sieved) and the **location weight is swept**.
+
+The features follow the facies rule: copper, zinc, manganese and cobalt, **bulk** on
+the iron ratio, **sieved** on the raw value, log-transformed and standardised. Bulk and
+sieved are clustered separately, complete cases only, outliers dropped.
+
+```{r}
+#| label: setup
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+
+rdir <- "data/merged_summary"
+rd <- function(f) read.csv(file.path(rdir, f), stringsAsFactors = FALSE,
+                           check.names = FALSE)
+sweep <- rd("merged_regions_weightsweep.csv")
+asg   <- rd("merged_regions_assignments.csv")
+sig   <- rd("merged_regions_signature.csv")
+meta  <- rd("merged_regions_meta.csv")
+
+CORE <- c("CU", "ZN", "MN", "CO")
+PAL  <- c("#4477AA", "#EE6677", "#228833", "#CCBB44")
+theme_set(theme_minimal(base_size = 12))
+```
+
+The cohort is the facies cohort: **`r format(meta$n_bulk, big.mark = ",")`** bulk and
+**`r format(meta$n_sieved, big.mark = ",")`** sieved samples with all four elements.
+
+## The weighting tradeoff
+
+As location weighs more, clusters get geographically tighter (lower geographic spread)
+but chemically less pure (higher chemical spread). Each curve is scaled to its
+chemistry-only value so the two read on one axis.
+
+```{r}
+#| label: sweep-fig
+#| fig-cap: "Within-cluster geographic and chemical spread against the location weight, each relative to the chemistry-only value. For bulk, a little geography (around 0.5) tightens the map while chemistry stays as pure or purer; past that it is a tradeoff. For sieved the curves barely move: the sieved data is geographically confined, so location adds almost nothing."
+#| fig-width: 8
+#| fig-height: 3.4
+sweep |>
+  pivot_longer(c(geo_km, chem), names_to = "metric", values_to = "v") |>
+  group_by(fraction, metric) |>
+  mutate(rel = v / v[loc_weight == 0]) |>
+  ungroup() |>
+  mutate(metric = recode(metric, geo_km = "geographic spread",
+                         chem = "chemical spread")) |>
+  ggplot(aes(loc_weight, rel, colour = metric)) +
+  geom_line(linewidth = 0.7) +
+  geom_point(size = 1.6) +
+  geom_vline(xintercept = meta$loc_weight_main, linetype = "dashed",
+             colour = "grey60") +
+  scale_colour_manual(values = c("geographic spread" = "#4477AA",
+                                 "chemical spread" = "#EE6677"), name = NULL) +
+  facet_wrap(~ fraction) +
+  labs(x = "location weight", y = "spread (relative to chemistry-only)")
+```
+
+The dashed line is the balanced weight (one) used for the maps below.
+
+## The regions at a balanced weight
+
+With location and chemistry balanced, the bulk samples fall into four contiguous
+regions, and the facies signatures from the first page reappear **attached to places**.
+
+```{r}
+#| label: sig-fig
+#| fig-cap: "Region signatures as log2 fold-change from the overall median (red enriched, blue depleted), bulk regions. The same copper-zinc and manganese contrasts as the facies page, now tied to geography."
+#| fig-width: 7
+#| fig-height: 2.8
+sig |>
+  filter(frac_class == "bulk") |>
+  mutate(feature = factor(feature, levels = CORE)) |>
+  group_by(feature) |>
+  mutate(fold = log2(median / median(median))) |>
+  ungroup() |>
+  ggplot(aes(feature, factor(region), fill = fold)) +
+  geom_tile(colour = "white", linewidth = 0.6) +
+  geom_text(aes(label = sprintf("%+.1f", fold)), size = 3) +
+  scale_fill_gradient2(low = "#4477AA", mid = "grey95", high = "#EE6677",
+                       midpoint = 0, name = "log2 fold") +
+  labs(x = NULL, y = "region") +
+  theme(panel.grid = element_blank())
+```
+
+```{r}
+#| label: region-table
+sig |>
+  distinct(frac_class, region, n, sea_area, lon, lat) |>
+  transmute(Fraction = frac_class, Region = region, n,
+            `main sea area` = sea_area, lon, lat) |>
+  arrange(Fraction, Region) |>
+  kable(caption = "Regions at the balanced weight: size, dominant sea area and centroid.")
+```
+
+The bulk regions read as a chemistry-aware map of the shelf:
+
+- **Region 3, the Norwegian Sea** is manganese-rich (Mn / Fe well above typical), the
+  deep-basin, oxic manganese signature the facies page found, here pinned to the
+  Norwegian Sea.
+- **Region 4, the southern North Sea** is the copper-zinc region (zinc almost double
+  typical), the contamination signature sitting where the pressure is.
+- **Region 1 (North Sea)** is a low-copper background and **Region 2 (Barents Sea)** is
+  manganese-poor: the quieter northern and background areas.
+
+The **sieved** samples, by contrast, split into two regions that are **both in the
+North Sea** and differ by chemistry, not place (a lower-metal and a several-times
+higher-metal group). That is the weighting curve made concrete: because the sieved data
+sits almost entirely in one area, geography has nothing to separate, so the combined
+clustering falls back to the facies answer.
+
+```{r}
+#| label: region-map
+#| fig-cap: "Regions at the balanced weight. Bulk resolves into contiguous chemical regions (Norwegian Sea, Barents, and two North Sea regions); sieved stays within the North Sea. Region numbering is per fraction."
+#| fig-width: 8.5
+#| fig-height: 5.6
+world <- ggplot2::map_data("world")
+d <- asg |> arrange(region)
+
+ggplot() +
+  geom_polygon(data = world, aes(long, lat, group = group),
+               fill = "grey93", colour = "grey80", linewidth = 0.2,
+               inherit.aes = FALSE) +
+  geom_point(data = d, aes(longitude, latitude, colour = factor(region)),
+             size = 0.7, alpha = 0.7) +
+  coord_quickmap(xlim = c(-20, 40), ylim = c(36, 82)) +
+  scale_colour_manual(values = PAL, name = "region") +
+  guides(colour = guide_legend(override.aes = list(size = 3, alpha = 1))) +
+  facet_wrap(~ frac_class) +
+  labs(x = NULL, y = NULL) +
+  theme(panel.grid = element_line(colour = "grey93"))
+```
+
+::: {.callout-note}
+The location weight is a **choice, not a truth**: it sets how much geography is allowed
+to shape the grouping, and the map would look tidier (more geographic) or more scattered
+(more chemical) at other settings. The balanced weight is shown because it is the honest
+midpoint, and the weighting curve is given so the choice is transparent. A useful
+by-product is the bulk sweet spot around a weight of one-half, where a little geography
+tightens the regions while chemistry stays as pure: the facies were spatially coherent
+enough that location resolves borderline samples rather than fighting the chemistry. As
+on the other Clustering pages the cohort is limited to samples with all four of copper,
+zinc, manganese and cobalt, so coverage, not chemistry, decides which areas appear.
+:::

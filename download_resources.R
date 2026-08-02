@@ -66,7 +66,11 @@ csvs <- c("merged_coverage_fraction.csv",
           "merged_hotspots_summary.csv",
           "merged_hotspots_top.csv",
           "merged_hotspots_points.csv",
-          "merged_hotspots_meta.csv")
+          "merged_hotspots_meta.csv",
+          "merged_regions_weightsweep.csv",
+          "merged_regions_assignments.csv",
+          "merged_regions_signature.csv",
+          "merged_regions_meta.csv")
 for (f in csvs) {
   dest <- file.path(csv_dir, f)
   if (!file.exists(dest)) {
