@@ -70,7 +70,10 @@ csvs <- c("merged_coverage_fraction.csv",
           "merged_regions_weightsweep.csv",
           "merged_regions_assignments.csv",
           "merged_regions_signature.csv",
-          "merged_regions_meta.csv")
+          "merged_regions_meta.csv",
+          "refined_tables.csv",
+          "refined_reconciliation.csv",
+          "refined_coverage.csv")
 for (f in csvs) {
   dest <- file.path(csv_dir, f)
   if (!file.exists(dest)) {
