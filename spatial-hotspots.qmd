@@ -120,7 +120,12 @@ ggplot() +
 DBSCAN uses one global neighbourhood radius, but marine sampling density is very
 uneven, so a fixed radius over-merges where sampling is dense and can miss a real but
 thinly sampled hotspot; the largest, named hotspots are robust to this, the smallest
-are not. A bulk hotspot is an **enrichment** hotspot (metal relative to iron), not
+are not. A variable-density alternative (HDBSCAN) was checked as a cross-method test:
+it agreed with DBSCAN on the uniform sieved data, and on the uneven bulk data it
+sharpened some labels (surfacing enclosed-sea zinc hotspots in the Skagerrak and the
+Baltic) but was sensitive to its cluster-size setting and gave no decisive
+improvement, so DBSCAN is kept. A bulk hotspot is an **enrichment** hotspot (metal
+relative to iron), not
 necessarily a high total-concentration one; the sieved hotspots track the North Sea
 monitoring footprint as much as the chemistry. Interpolating these points into a
 continuous surface is deliberately avoided: a marine interpolation would smear values
