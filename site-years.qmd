@@ -121,6 +121,14 @@ lithogenic carrier has come down over the years, the improvement signal the pool
 [Sampling Year](./temporal.qmd) page could only hint at. Copper leans the same way
 more weakly; manganese and cobalt are indistinct on the fewer cells that carry iron.
 
+This decline is scale-dependent, and that is a point in its favour. Repeated on a
+coarser 11 km grid it fades to near zero (a median correlation of about -0.02
+instead of -0.33): a wide cell lumps many sub-stations together, so comparing across
+years starts to compare places rather than times, and the spatial variation this
+design set out to remove leaks back in and dilutes the signal. It is a real trend at
+roughly one-kilometre resolution, but it rests on 55 locations, so read it as
+suggestive rather than settled.
+
 ```{r}
 #| label: b-fig
 #| fig-cap: "Within-cell metal/Fe trend by element. Zinc sits clearly left of zero (declining enrichment at fixed locations); the others straddle it."
@@ -172,8 +180,9 @@ not in the raw concentration but in the **Fe-normalised zinc** of section B.
 Holding location fixed is a big improvement on the pooled page, but not a controlled
 experiment: a cell can still contain a few sub-stations, and differencing location
 does not difference out changes in gear or laboratory within a cell over time. These
-remain associations. The one robust, direction-clear result is the decline in
-zinc relative to iron at repeat-sampled locations; everything else is flat or too
-thinly revisited to call. Molybdenum, selenium and iodine have too few repeat-sampled
+remain associations. The one direction-clear result is the decline in zinc relative
+to iron at repeat-sampled locations, and even that is scale-dependent (it holds at
+about one kilometre but fades at ten); everything else is flat or too thinly
+revisited to call. Molybdenum, selenium and iodine have too few repeat-sampled
 locations to appear.
 :::
