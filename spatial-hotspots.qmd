@@ -1,0 +1,129 @@
+---
+title: "Spatial Hotspots"
+subtitle: "Where elevated readings cluster geographically, element by element"
+---
+
+```{css, echo=FALSE}
+th { white-space: nowrap; }
+```
+
+The [Geochemical Facies](./geochemical-facies.qmd) page clusters samples in chemistry
+space. This one clusters them in **geographic** space, one element at a time, to
+locate the **hotspots**: regions where elevated readings pile up rather than appearing
+as one-off highs.
+
+The recipe is simple. For each element and fraction, keep only the **elevated**
+readings (the top fifth of the metric), project their positions to kilometres, and run
+DBSCAN, a density clustering method. A dense group of nearby elevated readings becomes
+a hotspot; an elevated reading with no elevated neighbours is left as "isolated" (a
+one-off, not a hotspot). The metric follows the same rule as the facies page: **bulk**
+on the iron ratio (metal / Fe, so a hotspot is an *enrichment* hotspot with grain size
+removed), **sieved** on the **raw** value. Bulk and sieved are treated separately, and
+distributional outliers are dropped.
+
+```{r}
+#| label: setup
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(knitr)
+
+hdir <- "data/merged_summary"
+rd <- function(f) read.csv(file.path(hdir, f), stringsAsFactors = FALSE,
+                           check.names = FALSE)
+summ <- rd("merged_hotspots_summary.csv")
+toph <- rd("merged_hotspots_top.csv")
+pts  <- rd("merged_hotspots_points.csv")
+meta <- rd("merged_hotspots_meta.csv")
+
+theme_set(theme_minimal(base_size = 12))
+```
+
+Elevated is the **top `r round(100 * (1 - meta$high_quantile))` percent** of the
+metric; DBSCAN uses a `r meta$eps_km` km neighbourhood and a minimum of
+`r meta$minpts` points to seed a hotspot.
+
+## How much clusters
+
+Across every element, most elevated readings do fall into a hotspot rather than
+standing alone. That is partly the phenomenon and partly the sampling: the survey
+coverage is itself spatially clustered (dense fjords and monitoring transects, sparse
+open sea), so at a fixed radius a large share of any subset groups up. The useful
+output is therefore not the clustered fraction but **which** hotspots are largest and
+where they sit.
+
+```{r}
+#| label: summary-table
+summ |>
+  transmute(Element = symbol, Fraction = frac_class, `elevated n` = n_high,
+            hotspots = n_hotspots, `% in a hotspot` = pct_clustered) |>
+  arrange(Fraction, Element) |>
+  kable(format.args = list(big.mark = ","))
+```
+
+## The largest hotspots
+
+Each hotspot is named by the sea area most of its samples fall in. Copper and zinc,
+the two contamination-relevant metals, are shown here (manganese and cobalt form
+their own hotspots, counted in the table above). The median value is the raw
+concentration of the members, so the
+enrichment-based bulk hotspots still report in mg/kg.
+
+```{r}
+#| label: top-table
+toph |>
+  filter(symbol %in% c("CU", "ZN"), rank <= 5) |>
+  transmute(Element = symbol, Fraction = frac_class, Rank = rank, n,
+            `sea area` = sea_area, `median mg/kg` = median_value) |>
+  kable(caption = "Five largest copper and zinc hotspots per fraction.")
+```
+
+The bulk (enrichment) hotspots spread across the shelf, the North Sea, the Norwegian
+Sea and the North Atlantic margin, wherever metal runs high relative to iron. The
+sieved hotspots, by contrast, sit almost entirely in the **North Sea**: that is where
+the sieved-fraction data is concentrated (the German and OSPAR monitoring), so the
+sieved map reflects where that programme sampled as much as where the metal is.
+
+## Maps
+
+Elevated readings for copper and zinc, coloured by whether DBSCAN placed them in a
+hotspot (red) or left them isolated (grey). Rows are the fraction, columns the element.
+
+```{r}
+#| label: hotspot-map
+#| fig-cap: "Elevated copper and zinc readings: red points belong to a spatial hotspot, grey points are isolated highs. The sieved row is dominated by the North Sea monitoring footprint."
+#| fig-width: 8.5
+#| fig-height: 8
+d <- pts |>
+  filter(symbol %in% c("CU", "ZN")) |>
+  mutate(kind = ifelse(hotspot_id > 0, "hotspot", "isolated")) |>
+  arrange(kind)   # draw hotspot points on top
+
+world <- ggplot2::map_data("world")
+
+ggplot() +
+  geom_polygon(data = world, aes(long, lat, group = group),
+               fill = "grey93", colour = "grey80", linewidth = 0.2,
+               inherit.aes = FALSE) +
+  geom_point(data = d, aes(longitude, latitude, colour = kind),
+             size = 0.7, alpha = 0.7) +
+  coord_quickmap(xlim = c(-20, 40), ylim = c(36, 82)) +
+  scale_colour_manual(values = c(hotspot = "#EE6677", isolated = "grey55"),
+                      name = NULL) +
+  guides(colour = guide_legend(override.aes = list(size = 3, alpha = 1))) +
+  facet_grid(frac_class ~ symbol) +
+  labs(x = NULL, y = NULL) +
+  theme(panel.grid = element_line(colour = "grey93"))
+```
+
+::: {.callout-note}
+DBSCAN uses one global neighbourhood radius, but marine sampling density is very
+uneven, so a fixed radius over-merges where sampling is dense and can miss a real but
+thinly sampled hotspot; the largest, named hotspots are robust to this, the smallest
+are not. A bulk hotspot is an **enrichment** hotspot (metal relative to iron), not
+necessarily a high total-concentration one; the sieved hotspots track the North Sea
+monitoring footprint as much as the chemistry. Interpolating these points into a
+continuous surface is deliberately avoided: a marine interpolation would smear values
+across peninsulas and between disconnected basins. Molybdenum, selenium and iodine are
+too sparsely measured to support spatial density clustering.
+:::
