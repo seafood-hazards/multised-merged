@@ -33,8 +33,8 @@ tribble(
 
 ## Pipeline generations
 
-The data moves through four generations, one SQLite database **per source** until the
-final merge:
+The data moves through five generations, one SQLite database **per source** until the
+merge, then a single database from there:
 
 1. **pilot**: each source's raw files parsed into a per-source database. Documented on
    the individual pilot sites:
@@ -51,24 +51,46 @@ final merge:
    [clean-analyses site](https://seafood-hazards.github.io/multised-clean/).
 4. **merged** *(this site)*: the five clean databases are combined into a single
    `multised_merged.sqlite`, with cross-source duplicates removed.
+5. **refined** *(creation documented on this site)*: a restructured, slimmed copy of
+   the merged database with the reusable analysis results baked in, built as an
+   analysis-ready base for the later pristine / background-sediment work. See the
+   [Refined DB](./refined-schema.qmd) pages.
 
 ## What this site covers
 
-**DB Design**
+**DB Design**: the table layouts, with entity-relationship diagrams.
 
-- [DB Schema (Merged)](./db-schema-merged.qmd): the table layout of the merged
-  database, with its entity-relationship diagram.
-- [DB Schema (Aquaculture)](./db-schema-aquaculture.qmd): the layout of the
-  aquaculture reference database.
+- [DB Schema (Merged)](./db-schema-merged.qmd): the merged database.
+- [DB Schema (Aquaculture)](./db-schema-aquaculture.qmd): the aquaculture reference.
 
-**Analyses** on the merged database:
+**Analyses** on the merged database (bulk samples, outliers dropped):
 
-- [Data Categories](./data-categories.qmd): how many measurements each element
-  carries, split by fraction, covariate availability and layering, with the
-  analyses each subset supports.
-- [Outlier Flagging](./outlier-flagging.qmd): marking values that sit implausibly
-  far from their element's distribution (mostly registration errors), the soft
-  `outlier_flag` on the merged database.
+- [Data Categories](./data-categories.qmd): measurement counts per element, by
+  fraction, covariate availability and layering, with the analyses each subset supports.
+- [Outlier Flagging](./outlier-flagging.qmd): the soft `outlier_flag` marking values
+  implausibly far from their element's distribution (mostly registration errors).
+- [Grain Size](./grain-size.qmd): how bulk concentrations track the mud (fines) content.
+- [Fe/Al Normalisation](./normalisation.qmd): metals against their lithogenic carriers,
+  iron and aluminium.
+- [Organic Carbon](./organic-carbon.qmd): metals against organic carbon.
+- [Depth Profiles](./depth-profile.qmd): how concentrations change down a core.
+- [Bulk vs Sieved](./enrichment.qmd): how much the sieved fraction concentrates metals
+  over bulk.
+- [Depth and Coast](./spatial.qmd): enrichment and covariates against water depth and
+  distance to coast.
+- [Sampling Year](./temporal.qmd): whether a trend over sampling year survives
+  normalisation.
+- [Repeat-Sampled Sites](./site-years.qmd): temporal trends within locations sampled in
+  several years, with location held roughly fixed.
+
+**Clustering** looks for unsupervised structure across the merged chemistry:
+
+- [Geochemical Facies](./geochemical-facies.qmd): multi-element signatures in chemistry
+  space (K-means).
+- [Spatial Hotspots](./spatial-hotspots.qmd): where elevated readings cluster
+  geographically (DBSCAN).
+- [Geochemical Regions](./geochemical-regions.qmd): clustering on location and
+  composition together.
 
 **Explore** browses the databases in the page, with no server (the SQLite files run
 in the browser via WebAssembly):
@@ -83,6 +105,13 @@ in the browser via WebAssembly):
   locations.
 - [Aquaculture Map](./aquaculture-map.qmd): the Norwegian aquaculture sites, active
   and closed.
+
+**Refined DB**: how a fifth, refined generation is built from the merged database, an
+analysis-ready database for the later pristine / background-sediment work.
+
+- [DB Schema (Refined)](./refined-schema.qmd): the refined table layout and what changed.
+- [Building the Refined DB](./refined-build.qmd): the step-by-step transformation and
+  what is kept.
 
 ::: {.callout-note}
 How the merged database is built, step by step (union, deduplication, finalise) and
