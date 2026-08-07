@@ -4,7 +4,18 @@ options(timeout = 600)
 # The merged database and the Norwegian aquaculture reference, from this repo's
 # GitHub release. Downloaded once; a local copy (e.g. symlinked from the pipeline
 # output) is reused if present.
-release <- "https://github.com/seafood-hazards/multised-merged/releases/download/v0.1.0"
+#
+# Everything comes from the LATEST release, so no tag is edited here. That means
+# EVERY release must carry all of these assets, or the next render 404s: use
+# _scripts/publish-release.sh, which uploads them in one command. Set DB_RELEASE
+# to pin an older release (e.g. DB_RELEASE=v0.1.0) when reproducing a build.
+repo    <- "seafood-hazards/multised-merged"
+tag     <- Sys.getenv("DB_RELEASE", "latest")
+release <- if (identical(tag, "latest")) {
+  sprintf("https://github.com/%s/releases/latest/download", repo)
+} else {
+  sprintf("https://github.com/%s/releases/download/%s", repo, tag)
+}
 dbs <- c("multised_merged.sqlite", "aquaculture_no.sqlite")
 for (f in dbs) {
   if (!file.exists(f)) {
