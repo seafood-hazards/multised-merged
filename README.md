@@ -49,9 +49,9 @@ whenever you `quarto render`, along with the client-side libraries
 rendering:
 
 ```bash
-# Merged + aquaculture databases, from this repository's v0.1.0 release
+# Merged + aquaculture databases, from this repository's latest release
 for f in multised_merged.sqlite aquaculture_no.sqlite; do
-  curl -LO https://github.com/seafood-hazards/multised-merged/releases/download/v0.1.0/$f
+  curl -LO https://github.com/seafood-hazards/multised-merged/releases/latest/download/$f
 done
 ```
 
