@@ -1,10 +1,31 @@
+```{r}
+#| echo: false
+#| output: false
+# Browser cache key, derived from the database's own bytes.
+#
+# It used to be the release tag:
+#     "multised-merged@v0.5.0"
+# That was wrong. The database is re-uploaded onto the EXISTING release rather
+# than tagged afresh, so the tag does not move when the file changes, and every
+# returning visitor went on serving the stale copy out of browser cache. That
+# surfaces as "no such column" the moment a rebuild adds one. Hashing the file is
+# exact by construction: same bytes, same key; new bytes, new key. The pre-render
+# step guarantees the file is here before this runs.
+ojs_define(
+  dbCacheKey = paste0(
+    "multised-merged@",
+    substr(unname(tools::md5sum("multised_merged.sqlite")), 1, 12)
+  )
+)
+```
+
 ```{ojs}
 //| output: false
 db = {
   const StratumSQLite = await window._stratumSQLite;
   return StratumSQLite.open(window._dbMerged, {
     sqlJsPath: window._sqljsBase,
-    cacheKey:  "multised-merged@v0.5.0",
+    cacheKey:  dbCacheKey,
   });
 }
 ```
