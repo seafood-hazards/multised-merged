@@ -73,7 +73,7 @@ The chart shows how much of each is populated.
 
 ```{r}
 #| label: coverage-fig
-#| fig-cap: "Percentage populated for each baked field, by table. Organic carbon is the best-covered normaliser for bulk, aluminium for sieved; the aquaculture link covers the Norway sites."
+#| fig-cap: "Percentage populated for each baked field, by table. Organic carbon is the best-covered ratio in bulk and aluminium in the sieved fractions; the aquaculture link covers the Norway sites. Coverage is not licence to normalise: under the bulk-normalised, sieved-raw rule a sieved ratio is a diagnostic, never a grain-size control."
 #| fig-width: 8
 #| fig-height: 4.2
 cov |>
